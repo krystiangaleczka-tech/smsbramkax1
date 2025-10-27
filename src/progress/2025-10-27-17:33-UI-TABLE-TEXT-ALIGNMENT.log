@@ -1,0 +1,19 @@
+PROGRESS LOG: 2025-10-27-17:33-UI-TABLE-TEXT-ALIGNMENT
+=====================================================
+
+ZADANIE: Wyśrodkowanie tekstów w kolumnach tabeli MessageTable.kt
+
+WYKONANE ZMIANY:
+1. Dodanie importu TextAlign do pliku MessageTable.kt
+2. Modyfikacja funkcji TableHeaderCell() - dodanie textAlign = TextAlign.Center
+3. Modyfikacja funkcji MessageRow() - dodanie textAlign = TextAlign.Center do wszystkich Text components
+4. Modyfikacja funkcji StatusBadge() - dodanie textAlign = TextAlign.Center
+
+PLIKI ZMODYFIKOWANE:
+- app/src/main/java/com/example/smsbramkax1/ui/components/MessageTable.kt
+
+WERYFIKACJA:
+- Projekt pomyślnie zbudowany bez błędów kompilacji
+- Wszystkie teksty w tabeli są teraz wyśrodkowane w swoich kolumnach
+
+STATUS: ZAKOŃCZONE
