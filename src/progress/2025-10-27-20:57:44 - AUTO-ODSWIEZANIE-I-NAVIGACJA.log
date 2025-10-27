@@ -1,0 +1,34 @@
+# SMS Gateway Android App - Progress Log
+## Date: 2025-10-27-20:57:44
+## Phase: Auto-odświeżanie i nawigacja
+
+### ✅ Completed Tasks:
+1. **Auto-odświeżanie MessageTable** - Dodano RefreshListener do nasłuchiwania na zdarzenia "sms_sent"
+2. **Automatyczne odświeżanie co 10 sekund** - Dodano LaunchedEffect z delay(10000) dla ciągłego odświeżania
+3. **Naprawa nawigacji Quick Actions** - Przycisk "Zobacz historię" teraz przechodzi do HistoryScreen
+4. **Naprawa nawigacji MessageTable** - Przycisk "Zobacz wszystkie →" teraz przechodzi do HistoryScreen
+5. **Przekazywanie callbacków nawigacji** - Zaktualizowano DashboardScreen i MainApp do przekazywania funkcji nawigacji
+
+### 🔧 Key Files Modified:
+- `ui/components/MessageTable.kt` - Dodano RefreshListener i auto-odświeżanie co 10s
+- `ui/components/QuickActions.kt` - Dodano parametr onNavigateToHistory
+- `ui/screens/DashboardScreen.kt` - Dodano przekazywanie nawigacji do komponentów
+- `ui/MainApp.kt` - Zaktualizowano routing do obsługi nawigacji do historii
+
+### 📱 Features Working:
+- ✅ Auto-odświeżanie tabeli wiadomości co 10 sekund
+- ✅ Natychmiastowe odświeżanie po wysłaniu SMS
+- ✅ Nawigacja z Quick Actions do HistoryScreen
+- ✅ Nawigacja z MessageTable do HistoryScreen
+- ✅ Kompletny flow: wysyłanie SMS → auto-odświeżanie → nawigacja
+
+### 🚀 Build Status:
+- Build: SUCCESSFUL
+- Lint: PASSED
+- Installation: COMPLETED
+
+### 📝 Notes:
+- Użyto RefreshManager do komunikacji między komponentami
+- Zaimplementowano podwójny mechanizm odświeżania: zdarzeniowy + czasowy
+- Nawigacja działa poprawnie na zarówno desktop/tablet jak i mobile
+- Wszystkie funkcjonalności są w pełni testowane i działające

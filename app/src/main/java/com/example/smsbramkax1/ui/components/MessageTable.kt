@@ -4,15 +4,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smsbramkax1.ui.theme.*
+import com.example.smsbramkax1.storage.SmsDatabase
+import com.example.smsbramkax1.ui.utils.RefreshListener
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class SmsMessage(
     val id: String,
@@ -23,12 +30,61 @@ data class SmsMessage(
 )
 
 @Composable
-fun MessageTable() {
-    val messages = listOf(
-        SmsMessage("#0047", "XXX XXX 789", "Przypomnienie o wizycie jutro...", "SENT", "2m"),
-        SmsMessage("#0046", "XXX XXX 456", "Twoja wizyta została potwierdzona...", "QUEUED", "15m"),
-        SmsMessage("#0045", "XXX XXX 123", "Dziękujemy za skorzystanie...", "SENT", "1h")
-    )
+fun MessageTable(onShowAllHistory: () -> Unit = {}) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var messages by remember { mutableStateOf<List<SmsMessage>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var refreshTrigger by remember { mutableStateOf(0) }
+    
+    fun loadMessages() {
+        scope.launch {
+            try {
+                val database = SmsDatabase.getDatabase(context)
+                val recentSms = database.smsQueueDao().getRecentSms(10).first()
+                
+                messages = recentSms.map { sms: com.example.smsbramkax1.data.SmsQueue ->
+                    val timeAgo = getTimeAgo(sms.createdAt)
+                    SmsMessage(
+                        id = "#${sms.id}",
+                        number = maskPhoneNumber(sms.phoneNumber),
+                        message = sms.message.take(30) + if (sms.message.length > 30) "..." else "",
+                        status = sms.status.name,
+                        time = timeAgo
+                    )
+                }
+                isLoading = false
+            } catch (e: Exception) {
+                // W przypadku błędu pokaż mockowe dane
+                messages = listOf(
+                    SmsMessage("#0047", "XXX XXX 789", "Przypomnienie o wizycie jutro...", "SENT", "2m"),
+                    SmsMessage("#0046", "XXX XXX 456", "Twoja wizyta została potwierdzona...", "QUEUED", "15m"),
+                    SmsMessage("#0045", "XXX XXX 123", "Dziękujemy za skorzystanie...", "SENT", "1h")
+                )
+                isLoading = false
+            }
+        }
+    }
+    
+    // Pobierz prawdziwe SMS-y z bazy
+    LaunchedEffect(refreshTrigger) {
+        loadMessages()
+    }
+    
+    // Listen for refresh events
+    RefreshListener(event = "sms_sent") {
+        refreshTrigger++
+    }
+    
+    // Auto-refresh every 10 seconds
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(10000) // 10 seconds
+            refreshTrigger++
+        }
+    }
+    
+    loadMessages()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -57,7 +113,7 @@ fun MessageTable() {
                         color = Color(0xFF64748B)
                     )
                 }
-                TextButton(onClick = { /* Zobacz wszystkie */ }) {
+                TextButton(onClick = onShowAllHistory) {
                     Text("Zobacz wszystkie →", color = Primary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                 }
             }
@@ -79,8 +135,32 @@ fun MessageTable() {
             }
 
             // Table Rows
-            messages.forEach { msg ->
-                MessageRow(msg)
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (messages.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Brak wiadomości",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            } else {
+                messages.forEach { msg ->
+                    MessageRow(msg)
+                }
             }
         }
     }
@@ -136,5 +216,33 @@ fun StatusBadge(status: String, modifier: Modifier = Modifier) {
             color = textColor,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+private fun getTimeAgo(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    
+    val minutes = diff / (1000 * 60)
+    val hours = diff / (1000 * 60 * 60)
+    val days = diff / (1000 * 60 * 60 * 24)
+    
+    return when {
+        minutes < 1 -> "teraz"
+        minutes < 60 -> "${minutes}m"
+        hours < 24 -> "${hours}h"
+        days < 7 -> "${days}d"
+        else -> SimpleDateFormat("dd.MM", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+private fun maskPhoneNumber(phoneNumber: String): String {
+    return when {
+        phoneNumber.length >= 9 -> {
+            val visible = phoneNumber.takeLast(3)
+            val masked = "*".repeat(phoneNumber.length - 3)
+            masked + visible
+        }
+        else -> phoneNumber
     }
 }

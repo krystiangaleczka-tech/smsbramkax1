@@ -12,7 +12,7 @@ import com.example.smsbramkax1.ui.components.*
 import com.example.smsbramkax1.ui.theme.*
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(onNavigateToHistory: () -> Unit = {}) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -76,13 +76,13 @@ fun DashboardScreen() {
 
         // Messages Table
         item {
-            MessageTable()
+            MessageTable(onShowAllHistory = onNavigateToHistory)
             Spacer(modifier = Modifier.height(16.dp))
         }
 
         // Quick Actions
         item {
-            QuickActions()
+            QuickActions(onNavigateToHistory = onNavigateToHistory)
         }
     }
 }
