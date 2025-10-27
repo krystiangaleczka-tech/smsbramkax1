@@ -23,6 +23,9 @@ interface SmsQueueDao {
 
     @Query("UPDATE sms_queue SET status = :status, sentAt = :sentAt WHERE id = :id")
     suspend fun updateSmsStatus(id: Long, status: SmsStatus, sentAt: Long)
+    
+    @Query("UPDATE sms_queue SET status = :status WHERE id = :id")
+    suspend fun updateSmsStatus(id: Long, status: SmsStatus)
 
     @Query("UPDATE sms_queue SET retryCount = retryCount + 1 WHERE id = :id")
     suspend fun incrementRetryCount(id: Long)
@@ -48,4 +51,10 @@ interface SmsQueueDao {
 
     @Query("SELECT * FROM sms_queue ORDER BY createdAt DESC")
     suspend fun getAllSms(): List<SmsQueue>
+    
+    @Query("SELECT * FROM sms_queue WHERE batchId = :batchId ORDER BY createdAt ASC")
+    suspend fun getSmsByBatchId(batchId: String): List<SmsQueue>
+    
+    @Query("SELECT COUNT(*) FROM sms_queue WHERE batchId = :batchId AND status = :status")
+    suspend fun countByBatchIdAndStatus(batchId: String, status: SmsStatus): Int
 }

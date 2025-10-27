@@ -54,7 +54,7 @@ fun Sidebar(
                 )
             }
 
-            Divider(color = Border)
+            HorizontalDivider(color = Border)
 
             // Navigation Items
             Column(
@@ -65,6 +65,10 @@ fun Sidebar(
                 NavItem("📊", "Dashboard", selectedPage == "Dashboard") { onPageSelected("Dashboard") }
                 NavItem("📜", "Historia SMS", selectedPage == "Historia SMS") { onPageSelected("Historia SMS") }
                 NavItem("📤", "Wyślij SMS", selectedPage == "Wyślij SMS") { onPageSelected("Wyślij SMS") }
+                NavItem("⏰", "Zaplanowane SMS", selectedPage == "Zaplanowane SMS") { onPageSelected("Zaplanowane SMS") }
+                NavItem("📝", "Szablony SMS", selectedPage == "Szablony SMS") { onPageSelected("Szablony SMS") }
+                NavItem("📢", "Masowe SMS", selectedPage == "Masowe SMS") { onPageSelected("Masowe SMS") }
+                NavItem("👥", "Kontakty", selectedPage == "Kontakty") { onPageSelected("Kontakty") }
                 NavItem("🔧", "Diagnostyka", selectedPage == "Diagnostyka") { onPageSelected("Diagnostyka") }
                 NavItem("⚙️", "Ustawienia", selectedPage == "Ustawienia") { onPageSelected("Ustawienia") }
             }

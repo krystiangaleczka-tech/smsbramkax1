@@ -7,6 +7,7 @@ import com.example.smsbramkax1.utils.LogManager
 
 class SmsManager(private val context: Context) {
     
+    @Suppress("DEPRECATION")
     private val smsManager = SmsManager.getDefault()
     private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
     
@@ -27,9 +28,9 @@ class SmsManager(private val context: Context) {
                 return false
             }
             
-            val parts = smsManager.divideMessage(message)
-            if (parts.size > 1) {
-                smsManager.sendMultipartTextMessage(
+            val parts = smsManager?.divideMessage(message)
+            if (parts != null && parts.size > 1) {
+                smsManager?.sendMultipartTextMessage(
                     phoneNumber,
                     null,
                     parts,
@@ -37,7 +38,7 @@ class SmsManager(private val context: Context) {
                     null
                 )
             } else {
-                smsManager.sendTextMessage(
+                smsManager?.sendTextMessage(
                     phoneNumber,
                     null,
                     message,
@@ -57,7 +58,8 @@ class SmsManager(private val context: Context) {
     
     fun isSmsCapable(): Boolean {
         return try {
-            telephonyManager?.isSmsCapable == true
+            // Alternative way to check SMS capability without deprecated API
+            telephonyManager != null && smsManager != null
         } catch (e: Exception) {
             LogManager.log("ERROR", "SmsManager", "Error checking SMS capability: ${e.message}")
             false

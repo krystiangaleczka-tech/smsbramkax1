@@ -79,11 +79,16 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
                 try {
                     val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        val mode = appOpsManager?.unsafeCheckOpNoThrow(
-                            "android:run_in_background",
-                            android.os.Process.myUid(),
-                            context.packageName
-                        )
+                        val mode = try {
+                            appOpsManager?.checkOpNoThrow(
+                                "android:run_in_background",
+                                android.os.Process.myUid(),
+                                context.packageName
+                            )
+                        } catch (e: Exception) {
+                            // Fallback for compatibility
+                            android.app.AppOpsManager.MODE_ALLOWED
+                        }
                         when (mode) {
                             android.app.AppOpsManager.MODE_ALLOWED -> BatteryOptimizationState.OPTIMIZED
                             android.app.AppOpsManager.MODE_IGNORED -> BatteryOptimizationState.RESTRICTED

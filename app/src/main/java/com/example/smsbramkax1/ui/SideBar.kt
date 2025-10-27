@@ -31,6 +31,11 @@ fun SideBar(
             SideBarItem("Dashboard", selectedItem == "Dashboard", onItemSelected)
             SideBarItem("Historia SMS", selectedItem == "Historia SMS", onItemSelected)
             SideBarItem("Wyślij SMS", selectedItem == "Wyślij SMS", onItemSelected)
+            SideBarItem("Zaplanowane SMS", selectedItem == "Zaplanowane SMS", onItemSelected)
+            SideBarItem("Szablony SMS", selectedItem == "Szablony SMS", onItemSelected)
+            SideBarItem("Masowe SMS", selectedItem == "Masowe SMS", onItemSelected)
+            SideBarItem("Kontakty", selectedItem == "Kontakty", onItemSelected)
+            SideBarItem("Diagnostyka", selectedItem == "Diagnostyka", onItemSelected)
             SideBarItem("Ustawienia", selectedItem == "Ustawienia", onItemSelected)
         }
     }

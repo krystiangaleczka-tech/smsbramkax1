@@ -13,6 +13,15 @@ import com.example.smsbramkax1.ui.screens.DashboardScreen
 import com.example.smsbramkax1.ui.screens.DiagnosticsScreen
 import com.example.smsbramkax1.ui.screens.HistoryScreen
 import com.example.smsbramkax1.ui.screens.SettingsScreen
+import com.example.smsbramkax1.ui.screens.ScheduledSmsScreen
+import com.example.smsbramkax1.ui.screens.TemplatesScreen
+import com.example.smsbramkax1.ui.screens.BulkSmsScreen
+import com.example.smsbramkax1.ui.screens.ContactPickerScreen
+import com.example.smsbramkax1.sms.ScheduledSmsManager
+import com.example.smsbramkax1.sms.TemplateManager
+import com.example.smsbramkax1.sms.BulkSmsManager
+import com.example.smsbramkax1.utils.ContactManager
+import com.example.smsbramkax1.utils.PermissionsManager
 import com.example.smsbramkax1.ui.theme.CardBg
 import com.example.smsbramkax1.ui.theme.Foreground
 import com.example.smsbramkax1.utils.HealthChecker
@@ -45,6 +54,41 @@ fun MainApp() {
                     )
                     "Historia SMS" -> HistoryScreen(onBack = { selectedPage = "Dashboard" })
                     "Wyślij SMS" -> PlaceholderScreen("Wyślij SMS")
+                    "Zaplanowane SMS" -> {
+                        val context = LocalContext.current
+                        val scheduledSmsManager = ScheduledSmsManager.getInstance(context)
+                        ScheduledSmsScreen(
+                            scheduledSmsManager = scheduledSmsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Szablony SMS" -> {
+                        val context = LocalContext.current
+                        val templateManager = TemplateManager.getInstance(context)
+                        TemplatesScreen(
+                            templateManager = templateManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Masowe SMS" -> {
+                        val context = LocalContext.current
+                        val bulkSmsManager = BulkSmsManager.getInstance(context)
+                        BulkSmsScreen(
+                            bulkSmsManager = bulkSmsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Kontakty" -> {
+                        val context = LocalContext.current
+                        val contactManager = ContactManager.getInstance(context)
+                        val permissionsManager = PermissionsManager(context)
+                        ContactPickerScreen(
+                            contactManager = contactManager,
+                            permissionsManager = permissionsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" },
+                            onContactsSelected = { /* Handle selected contacts */ }
+                        )
+                    }
                     "Diagnostyka" -> {
                         val context = LocalContext.current
                         val database = SmsDatabase.getDatabase(context)
@@ -85,6 +129,41 @@ fun MainApp() {
                     )
                     "Historia SMS" -> HistoryScreen(onBack = { selectedPage = "Dashboard" })
                     "Wyślij SMS" -> PlaceholderScreen("Wyślij SMS")
+                    "Zaplanowane SMS" -> {
+                        val context = LocalContext.current
+                        val scheduledSmsManager = ScheduledSmsManager.getInstance(context)
+                        ScheduledSmsScreen(
+                            scheduledSmsManager = scheduledSmsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Szablony SMS" -> {
+                        val context = LocalContext.current
+                        val templateManager = TemplateManager.getInstance(context)
+                        TemplatesScreen(
+                            templateManager = templateManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Masowe SMS" -> {
+                        val context = LocalContext.current
+                        val bulkSmsManager = BulkSmsManager.getInstance(context)
+                        BulkSmsScreen(
+                            bulkSmsManager = bulkSmsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" }
+                        )
+                    }
+                    "Kontakty" -> {
+                        val context = LocalContext.current
+                        val contactManager = ContactManager.getInstance(context)
+                        val permissionsManager = PermissionsManager(context)
+                        ContactPickerScreen(
+                            contactManager = contactManager,
+                            permissionsManager = permissionsManager,
+                            onNavigateBack = { selectedPage = "Dashboard" },
+                            onContactsSelected = { /* Handle selected contacts */ }
+                        )
+                    }
                     "Diagnostyka" -> {
                         val context = LocalContext.current
                         val database = SmsDatabase.getDatabase(context)

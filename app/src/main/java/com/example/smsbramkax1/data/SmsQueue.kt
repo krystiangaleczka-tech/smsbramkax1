@@ -11,11 +11,14 @@ data class SmsQueue(
     val id: Long = 0,
     val phoneNumber: String,
     val message: String,
+    val messageBody: String = message, // Alias for backward compatibility
     val status: SmsStatus = SmsStatus.PENDING,
     val priority: Int = 5,
     val createdAt: Long = System.currentTimeMillis(),
     val scheduledAt: Long? = null,
     val sentAt: Long? = null,
     val retryCount: Int = 0,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val batchId: String? = null,
+    val category: String? = null
 )

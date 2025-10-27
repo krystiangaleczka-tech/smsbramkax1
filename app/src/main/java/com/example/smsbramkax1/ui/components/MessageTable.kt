@@ -118,7 +118,7 @@ fun MessageTable(onShowAllHistory: () -> Unit = {}) {
                 }
             }
 
-            Divider(color = Border)
+            HorizontalDivider(color = Border)
 
             // Table Header
             Row(
@@ -192,7 +192,7 @@ fun MessageRow(message: SmsMessage) {
         StatusBadge(message.status, Modifier.weight(1.2f))
         Text(message.time, fontSize = 10.sp, color = Color(0xFF64748B), textAlign = TextAlign.Center, modifier = Modifier.weight(0.8f))
     }
-    Divider(color = Border)
+    HorizontalDivider(color = Border)
 }
 
 @Composable

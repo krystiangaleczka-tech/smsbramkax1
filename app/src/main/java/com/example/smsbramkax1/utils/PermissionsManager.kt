@@ -70,6 +70,10 @@ class PermissionsManager(private val context: Context) {
         }
     }
     
+    fun hasContactsPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+    
     fun getMissingPermissions(): List<String> {
         return REQUIRED_PERMISSIONS.filter { permission ->
             ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
