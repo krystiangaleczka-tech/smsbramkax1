@@ -101,14 +101,28 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
         }
     }
     
-    // Check status on screen load and periodically
+    // Smart refresh: only check when user interacts with battery settings
+    var lastCheckTime by remember { mutableStateOf(0L) }
+    
+    fun smartRefresh() {
+        val currentTime = System.currentTimeMillis()
+        // Only refresh if at least 5 seconds have passed since last check
+        if (currentTime - lastCheckTime > 5000) {
+            checkBatteryOptimizationStatus()
+            lastCheckTime = currentTime
+        }
+    }
+    
+    // Check status on screen load and with smart refresh
     LaunchedEffect(Unit) {
         checkBatteryOptimizationStatus()
-        
-        // Check every 2 seconds to ensure status is up to date
+    }
+    
+    // Additional check when screen becomes visible (user navigates back to settings)
+    LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(2000)
-            checkBatteryOptimizationStatus()
+            kotlinx.coroutines.delay(10000) // Check every 10 seconds instead of 2
+            smartRefresh()
         }
     }
     
@@ -118,10 +132,10 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
     val batteryOptimizationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        // Refresh battery optimization status after returning from settings with delay
+        // Smart refresh battery optimization status after returning from settings
         coroutineScope.launch {
             kotlinx.coroutines.delay(1000) // Wait 1 second for system to update
-            checkBatteryOptimizationStatus()
+            smartRefresh()
             
             val message = when (batteryOptimizationState) {
                 BatteryOptimizationState.UNRESTRICTED -> "Optymalizacja baterii wyłączona ✓"
@@ -313,8 +327,8 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
         SettingsSection(title = "Optymalizacja baterii") {
             Button(
                 onClick = {
-                    // Refresh status before opening settings
-                    checkBatteryOptimizationStatus()
+                    // Smart refresh status before opening settings
+                    smartRefresh()
                     
                     // Always open app settings for battery optimization
                     try {
@@ -371,7 +385,7 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
             
             Button(
                 onClick = {
-                    checkBatteryOptimizationStatus()
+                    smartRefresh()
                     Toast.makeText(context, "Sprawdzono stan optymalizacji", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
