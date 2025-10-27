@@ -4,16 +4,18 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.smsbramkax1.data.SmsMessage
+import androidx.room.TypeConverters
+import com.example.smsbramkax1.data.SmsQueue
 import com.example.smsbramkax1.data.SystemLog
 
 @Database(
-    entities = [SmsMessage::class, SystemLog::class],
+    entities = [SmsQueue::class, SystemLog::class],
     version = 1,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class SmsDatabase : RoomDatabase() {
-    abstract fun smsDao(): SmsDao
+    abstract fun smsQueueDao(): SmsQueueDao
     abstract fun logDao(): LogDao
 
     companion object {
@@ -25,10 +27,8 @@ abstract class SmsDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SmsDatabase::class.java,
-                    "smsbramkax1_database"
-                )
-                    .fallbackToDestructiveMigration(dropAllTables = false)
-                    .build()
+                    "sms_database"
+                ).build()
                 INSTANCE = instance
                 instance
             }

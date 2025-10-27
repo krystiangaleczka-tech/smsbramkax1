@@ -9,7 +9,9 @@ data class SystemLog(
     val id: Long = 0,
     val timestamp: Long = 0L,
     val level: String = "", // DEBUG, INFO, WARN, ERROR
-    val tag: String = "",
+    val category: String = "",
     val message: String = "",
-    val details: String? = null
+    val smsId: Long? = null,
+    val stackTrace: String? = null,
+    val meta: String? = null
 )
