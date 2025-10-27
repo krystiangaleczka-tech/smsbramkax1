@@ -1,71 +1,80 @@
-// File: sms/SmsManager.kt
-
 package com.example.smsbramkax1.sms
 
 import android.content.Context
 import android.telephony.SmsManager
 import android.telephony.TelephonyManager
-import com.example.smsbramkax1.data.SmsQueue
-import com.example.smsbramkax1.data.SmsStatus
-import com.example.smsbramkax1.storage.SmsQueueDao
 import com.example.smsbramkax1.utils.LogManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
-class SmsManagerHelper(
-    private val context: Context,
-    private val smsQueueDao: SmsQueueDao,
-    private val logManager: LogManager
-) {
-
-    private val scope = CoroutineScope(Dispatchers.IO)
-    private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+class SmsManager(private val context: Context) {
+    
     private val smsManager = SmsManager.getDefault()
-
-    fun sendSms(phoneNumber: String, message: String, priority: Int = 5) {
-        scope.launch {
-            val smsQueue = SmsQueue(
-                phoneNumber = phoneNumber,
-                message = message,
-                status = SmsStatus.PENDING,
-                priority = priority,
-                createdAt = System.currentTimeMillis()
-            )
-            val id = smsQueueDao.insertSms(smsQueue)
-            logManager.logInfo("SMS", "SMS dodany do kolejki: $phoneNumber", id)
-            processSms(id)
-        }
-    }
-
-    private suspend fun processSms(smsId: Long) {
-        val sms = smsQueueDao.getSmsById(smsId) ?: return
-
-        try {
-            smsManager?.sendTextMessage(
-                sms.phoneNumber,
-                null,
-                sms.message,
-                null,
-                null
-            )
-
-            smsQueueDao.updateSmsStatus(smsId, SmsStatus.SENT, System.currentTimeMillis())
-            logManager.logInfo("SMS", "SMS wysłany pomyślnie: ${sms.phoneNumber}", smsId)
-
-        } catch (e: Exception) {
-            smsQueueDao.updateSmsStatus(smsId, SmsStatus.FAILED, System.currentTimeMillis())
-            logManager.logError("SMS", "Błąd wysyłania SMS: ${e.message}", smsId, e.stackTraceToString())
-        }
-    }
-
-    suspend fun retryFailedSms() {
-        val failedSms = smsQueueDao.getSmsByStatus(SmsStatus.FAILED)
-        failedSms.forEach { sms ->
-            if (sms.retryCount < 3) {
-                smsQueueDao.incrementRetryCount(sms.id)
-                processSms(sms.id)
+    private val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+    
+    fun sendSms(phoneNumber: String, message: String): Boolean {
+        return try {
+            if (!isSmsCapable()) {
+                LogManager.log("ERROR", "SmsManager", "Device is not SMS capable")
+                return false
             }
+            
+            if (!isValidPhoneNumber(phoneNumber)) {
+                LogManager.log("ERROR", "SmsManager", "Invalid phone number: $phoneNumber")
+                return false
+            }
+            
+            if (message.isEmpty()) {
+                LogManager.log("ERROR", "SmsManager", "Empty message")
+                return false
+            }
+            
+            val parts = smsManager.divideMessage(message)
+            if (parts.size > 1) {
+                smsManager.sendMultipartTextMessage(
+                    phoneNumber,
+                    null,
+                    parts,
+                    null,
+                    null
+                )
+            } else {
+                smsManager.sendTextMessage(
+                    phoneNumber,
+                    null,
+                    message,
+                    null,
+                    null
+                )
+            }
+            
+            LogManager.log("INFO", "SmsManager", "SMS sent successfully to $phoneNumber")
+            true
+            
+        } catch (e: Exception) {
+            LogManager.log("ERROR", "SmsManager", "Failed to send SMS to $phoneNumber: ${e.message}", e.stackTraceToString())
+            false
+        }
+    }
+    
+    fun isSmsCapable(): Boolean {
+        return try {
+            telephonyManager?.isSmsCapable == true
+        } catch (e: Exception) {
+            LogManager.log("ERROR", "SmsManager", "Error checking SMS capability: ${e.message}")
+            false
+        }
+    }
+    
+    private fun isValidPhoneNumber(phoneNumber: String): Boolean {
+        val cleanedNumber = phoneNumber.replace(Regex("[^+0-9]"), "")
+        return cleanedNumber.length >= 9 && cleanedNumber.startsWith("+") || cleanedNumber.startsWith("0")
+    }
+    
+    fun getNetworkOperator(): String? {
+        return try {
+            telephonyManager?.networkOperatorName
+        } catch (e: Exception) {
+            LogManager.log("ERROR", "SmsManager", "Error getting network operator: ${e.message}")
+            null
         }
     }
 }

@@ -42,6 +42,32 @@ class LogManager(private val logDao: LogDao) {
         }
     }
 
+    companion object {
+        private var instance: LogManager? = null
+        
+        fun initialize(logDao: LogDao) {
+            instance = LogManager(logDao)
+        }
+        
+        fun log(level: String, category: String, message: String, smsId: Long? = null, stackTrace: String? = null) {
+            instance?.log(level, category, message, smsId, stackTrace)
+            android.util.Log.println(
+                when (level) {
+                    "ERROR" -> android.util.Log.ERROR
+                    "WARN", "WARNING" -> android.util.Log.WARN
+                    "INFO" -> android.util.Log.INFO
+                    else -> android.util.Log.DEBUG
+                },
+                "SMSGateway",
+                "[$category] $message"
+            )
+        }
+        
+        fun log(level: String, category: String, message: String, stackTrace: String? = null) {
+            log(level, category, message, null, stackTrace)
+        }
+    }
+
     suspend fun getRecentLogs(limit: Int = 100) = logDao.getRecentLogs(limit).first()
 
     suspend fun getLogsByLevel(level: String) = logDao.getLogsByLevel(level).first()
