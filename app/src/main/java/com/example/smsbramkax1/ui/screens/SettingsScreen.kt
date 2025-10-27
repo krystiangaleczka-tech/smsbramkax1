@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
+import android.app.AppOpsManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +19,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
+
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +38,14 @@ import com.example.smsbramkax1.utils.ErrorHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+// Battery optimization states
+enum class BatteryOptimizationState {
+    UNRESTRICTED,    // Nieograniczony - bez optymalizacji
+    OPTIMIZED,       // Zoptymalizowany - standardowa optymalizacja
+    RESTRICTED,      // Ograniczony - agresywna optymalizacja
+    UNKNOWN          // Nieznany stan
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,12 +64,72 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
     var showClearDataDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     
+    var batteryOptimizationState by remember { mutableStateOf(BatteryOptimizationState.UNKNOWN) }
+    
+    // Function to check detailed battery optimization status
+    fun checkBatteryOptimizationStatus() {
+        batteryOptimizationState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val isIgnoring = powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+            
+            if (isIgnoring) {
+                BatteryOptimizationState.UNRESTRICTED
+            } else {
+                // Check if app is in restricted mode (requires additional checks)
+                try {
+                    val appOpsManager = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val mode = appOpsManager?.unsafeCheckOpNoThrow(
+                            "android:run_in_background",
+                            android.os.Process.myUid(),
+                            context.packageName
+                        )
+                        when (mode) {
+                            android.app.AppOpsManager.MODE_ALLOWED -> BatteryOptimizationState.OPTIMIZED
+                            android.app.AppOpsManager.MODE_IGNORED -> BatteryOptimizationState.RESTRICTED
+                            else -> BatteryOptimizationState.OPTIMIZED
+                        }
+                    } else {
+                        BatteryOptimizationState.OPTIMIZED
+                    }
+                } catch (e: Exception) {
+                    BatteryOptimizationState.OPTIMIZED
+                }
+            }
+        } else {
+            BatteryOptimizationState.UNKNOWN
+        }
+    }
+    
+    // Check status on screen load and periodically
+    LaunchedEffect(Unit) {
+        checkBatteryOptimizationStatus()
+        
+        // Check every 2 seconds to ensure status is up to date
+        while (true) {
+            kotlinx.coroutines.delay(2000)
+            checkBatteryOptimizationStatus()
+        }
+    }
+    
+
+    
     // Launcher for battery optimization exemption
     val batteryOptimizationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            Toast.makeText(context, "Optymalizacja baterii wyłączona", Toast.LENGTH_SHORT).show()
+        // Refresh battery optimization status after returning from settings with delay
+        coroutineScope.launch {
+            kotlinx.coroutines.delay(1000) // Wait 1 second for system to update
+            checkBatteryOptimizationStatus()
+            
+            val message = when (batteryOptimizationState) {
+                BatteryOptimizationState.UNRESTRICTED -> "Optymalizacja baterii wyłączona ✓"
+                BatteryOptimizationState.OPTIMIZED -> "Tryb zoptymalizowany"
+                BatteryOptimizationState.RESTRICTED -> "Tryb ograniczony"
+                BatteryOptimizationState.UNKNOWN -> "Nieznany stan optymalizacji"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -241,28 +313,71 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
         SettingsSection(title = "Optymalizacja baterii") {
             Button(
                 onClick = {
+                    // Refresh status before opening settings
+                    checkBatteryOptimizationStatus()
+                    
+                    // Always open app settings for battery optimization
                     try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                data = android.net.Uri.parse("package:${context.packageName}")
-                            }
-                            batteryOptimizationLauncher.launch(intent)
-                        } else {
-                            Toast.makeText(context, "Ta funkcja wymaga Android 6.0+", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Błąd otwierania ustawień: ${e.message}", Toast.LENGTH_LONG).show()
-                        // Fallback to app settings
                         val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = android.net.Uri.parse("package:${context.packageName}")
                         }
                         context.startActivity(settingsIntent)
+                        Toast.makeText(context, "Wybierz opcję zużycia baterii", Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Błąd otwierania ustawień: ${e.message}", Toast.LENGTH_LONG).show()
                     }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = when (batteryOptimizationState) {
+                        BatteryOptimizationState.UNRESTRICTED -> Success
+                        BatteryOptimizationState.OPTIMIZED -> Primary
+                        BatteryOptimizationState.RESTRICTED -> Color(0xFFEF4444) // Red
+                        BatteryOptimizationState.UNKNOWN -> CardBg
+                    },
+                    contentColor = when (batteryOptimizationState) {
+                        BatteryOptimizationState.UNRESTRICTED -> Color.White
+                        BatteryOptimizationState.OPTIMIZED -> Color.White
+                        BatteryOptimizationState.RESTRICTED -> Color.White
+                        BatteryOptimizationState.UNKNOWN -> Foreground
+                    }
+                )
+            ) {
+                Text(
+                    text = when (batteryOptimizationState) {
+                        BatteryOptimizationState.UNRESTRICTED -> "✓ Nieograniczone"
+                        BatteryOptimizationState.OPTIMIZED -> "Zoptymalizowane"
+                        BatteryOptimizationState.RESTRICTED -> "⚠ Ograniczone"
+                        BatteryOptimizationState.UNKNOWN -> "Sprawdź ustawienia baterii"
+                    }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = when (batteryOptimizationState) {
+                    BatteryOptimizationState.UNRESTRICTED -> "Aplikacja działa bez ograniczeń baterii"
+                    BatteryOptimizationState.OPTIMIZED -> "Standardowa optymalizacja baterii"
+                    BatteryOptimizationState.RESTRICTED -> "Agresywna optymalizacja - może ograniczać działanie"
+                    BatteryOptimizationState.UNKNOWN -> "Nie można określić stanu optymalizacji"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Foreground.copy(alpha = 0.7f),
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = {
+                    checkBatteryOptimizationStatus()
+                    Toast.makeText(context, "Sprawdzono stan optymalizacji", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg, contentColor = Foreground)
             ) {
-                Text("Wyłącz optymalizację baterii")
+                Text("🔄 Odśwież stan")
             }
         }
         

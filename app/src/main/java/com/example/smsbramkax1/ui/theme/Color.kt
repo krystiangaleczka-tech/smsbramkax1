@@ -15,3 +15,4 @@ val StatusSentBg = Color(0xFFDCFCE7)
 val StatusSentText = Color(0xFF166534)
 val StatusQueuedBg = Color(0xFFFEF9C3)
 val StatusQueuedText = Color(0xFF854D0E)
+val Success = Color(0xFF22C55E)  // Green for success states
