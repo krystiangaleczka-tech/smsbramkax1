@@ -65,6 +65,7 @@ fun Sidebar(
                 NavItem("📊", "Dashboard", selectedPage == "Dashboard") { onPageSelected("Dashboard") }
                 NavItem("📜", "Historia SMS", selectedPage == "Historia SMS") { onPageSelected("Historia SMS") }
                 NavItem("📤", "Wyślij SMS", selectedPage == "Wyślij SMS") { onPageSelected("Wyślij SMS") }
+                NavItem("🔧", "Diagnostyka", selectedPage == "Diagnostyka") { onPageSelected("Diagnostyka") }
                 NavItem("⚙️", "Ustawienia", selectedPage == "Ustawienia") { onPageSelected("Ustawienia") }
             }
         }

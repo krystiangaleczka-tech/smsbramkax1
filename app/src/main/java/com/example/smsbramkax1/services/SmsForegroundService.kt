@@ -14,6 +14,7 @@ import com.example.smsbramkax1.MainActivity
 import com.example.smsbramkax1.R
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.utils.LogManager
+import com.example.smsbramkax1.utils.Notify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,8 +49,8 @@ class SmsForegroundService : Service() {
     }
     
     private fun startForegroundService() {
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        val notification = Notify.foregroundNotification(this, "Uruchamianie usługi...")
+        startForeground(Notify.ID_FOREGROUND, notification)
         
         serviceScope.launch {
             try {
@@ -108,20 +109,14 @@ class SmsForegroundService : Service() {
                 val scheduledCount = database.smsQueueDao().getSmsCountByStatus(com.example.smsbramkax1.data.SmsStatus.SCHEDULED).first()
                 val failedCount = database.smsQueueDao().getSmsCountByStatus(com.example.smsbramkax1.data.SmsStatus.FAILED).first()
                 
-                val contentText = "Pending: $pendingCount | Scheduled: $scheduledCount | Failed: $failedCount"
+                val contentText = "Oczekujące: $pendingCount | Zaplanowane: $scheduledCount | Błędy: $failedCount"
                 
-                val notification = NotificationCompat.Builder(this@SmsForegroundService, CHANNEL_ID)
-                    .setContentTitle("SMS Gateway Active")
-                    .setContentText(contentText)
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
-                    .setOngoing(true)
-                    .setSilent(true)
-                    .build()
-                
-                notificationManager.notify(NOTIFICATION_ID, notification)
+                val notification = Notify.foregroundNotification(this@SmsForegroundService, contentText)
+                notificationManager.notify(Notify.ID_FOREGROUND, notification)
                 
             } catch (e: Exception) {
                 LogManager.log("ERROR", "SmsForegroundService", "Error updating notification: ${e.message}")
+                Notify.error(this@SmsForegroundService, "Błąd usługi", "Problem z aktualizacją statusu: ${e.message}")
             }
         }
     }

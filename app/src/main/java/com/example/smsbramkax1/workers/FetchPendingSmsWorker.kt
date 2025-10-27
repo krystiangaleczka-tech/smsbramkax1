@@ -8,6 +8,7 @@ import com.example.smsbramkax1.data.SmsStatus
 import com.example.smsbramkax1.network.NetworkManager
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.utils.LogManager
+import com.example.smsbramkax1.utils.Notify
 import com.example.smsbramkax1.utils.SecureStorage
 import kotlinx.coroutines.flow.first
 
@@ -60,6 +61,14 @@ class FetchPendingSmsWorker(
             
         } catch (e: Exception) {
             LogManager.log("ERROR", "FetchPendingSmsWorker", "Failed to fetch pending SMS: ${e.message}", e.stackTraceToString())
+            
+            // Powiadomienie o błędzie sieci
+            Notify.error(
+                applicationContext,
+                "Błąd synchronizacji",
+                "Nie udało się pobrać oczekujących SMS-ów: ${e.message}"
+            )
+            
             Result.failure()
         }
     }

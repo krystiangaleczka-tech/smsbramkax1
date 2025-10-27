@@ -22,6 +22,7 @@ import com.example.smsbramkax1.ui.theme.*
 import com.example.smsbramkax1.sms.SmsManager
 import com.example.smsbramkax1.utils.Notify
 import com.example.smsbramkax1.utils.NetworkState
+import com.example.smsbramkax1.utils.PermissionsManager
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.ui.utils.RefreshManager
 import kotlinx.coroutines.CoroutineScope
@@ -34,15 +35,17 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun QuickActions(onNavigateToHistory: () -> Unit = {}) {
+fun QuickActions(onNavigateToHistory: () -> Unit = {}, onNavigateToSettings: () -> Unit = {}) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val permissionsManager = remember { PermissionsManager(context) }
     
-    // Launcher for SMS permission
+    // Launcher for SMS permissions
     val smsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
             sendTestSms(context, coroutineScope)
         } else {
             Toast.makeText(context, "Brak uprawnień do wysyłania SMS", Toast.LENGTH_LONG).show()
@@ -80,14 +83,17 @@ fun QuickActions(onNavigateToHistory: () -> Unit = {}) {
                     modifier = Modifier.weight(1f),
                     onClick = {
                         when {
-                            ContextCompat.checkSelfPermission(
-                                context, 
-                                Manifest.permission.SEND_SMS
-                            ) == PackageManager.PERMISSION_GRANTED -> {
+                            permissionsManager.hasSmsPermissions() -> {
                                 sendTestSms(context, coroutineScope)
                             }
                             else -> {
-                                smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
+                                smsPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.SEND_SMS,
+                                        Manifest.permission.RECEIVE_SMS,
+                                        Manifest.permission.READ_SMS
+                                    )
+                                )
                             }
                         }
                     }
@@ -105,7 +111,7 @@ fun QuickActions(onNavigateToHistory: () -> Unit = {}) {
                     exportSmsData(context, coroutineScope)
                 }
                 ActionButton("⚙️", "Ustawienia", isPrimary = false, Modifier.weight(1f)) {
-                    showSettings(context)
+                    onNavigateToSettings()
                 }
             }
         }

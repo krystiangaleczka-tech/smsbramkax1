@@ -35,4 +35,17 @@ interface SmsQueueDao {
 
     @Query("SELECT * FROM sms_queue ORDER BY createdAt DESC LIMIT :limit")
     fun getRecentSms(limit: Int = 100): Flow<List<SmsQueue>>
+
+    // Metody statystyczne dla HealthChecker
+    @Query("SELECT COUNT(*) FROM sms_queue WHERE status = :status")
+    suspend fun countByStatus(status: String): Int
+
+    @Query("SELECT COUNT(*) FROM sms_queue WHERE status = 'FAILED' AND createdAt >= :since")
+    suspend fun countFailedSince(since: Long): Int
+
+    @Query("SELECT MAX(sentAt) FROM sms_queue WHERE sentAt IS NOT NULL")
+    suspend fun lastSentAt(): Long?
+
+    @Query("SELECT * FROM sms_queue ORDER BY createdAt DESC")
+    suspend fun getAllSms(): List<SmsQueue>
 }

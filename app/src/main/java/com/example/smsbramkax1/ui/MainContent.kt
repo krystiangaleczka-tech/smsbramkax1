@@ -8,6 +8,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.example.smsbramkax1.storage.SmsDatabase
+import com.example.smsbramkax1.ui.screens.DiagnosticsScreen
+import com.example.smsbramkax1.utils.HealthChecker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,6 +26,15 @@ fun MainContent(selectedTab: String, onTabSelected: (String) -> Unit) {
                 "Dashboard" -> Dashboard()
                 "Historia SMS" -> Text("Strona historii SMS")
                 "Wyślij SMS" -> Text("Strona wysyłania SMS")
+                "Diagnostyka" -> {
+                    val context = LocalContext.current
+                    val database = SmsDatabase.getDatabase(context)
+                    val healthChecker = HealthChecker(context, database.smsQueueDao())
+                    DiagnosticsScreen(
+                        healthChecker = healthChecker,
+                        logDao = database.logDao()
+                    )
+                }
                 "Ustawienia" -> Text("Strona ustawień")
                 else -> Text("Nieznana strona")
             }

@@ -12,6 +12,7 @@ import com.example.smsbramkax1.ui.components.Sidebar
 import com.example.smsbramkax1.ui.screens.DashboardScreen
 import com.example.smsbramkax1.ui.screens.DiagnosticsScreen
 import com.example.smsbramkax1.ui.screens.HistoryScreen
+import com.example.smsbramkax1.ui.screens.SettingsScreen
 import com.example.smsbramkax1.ui.theme.CardBg
 import com.example.smsbramkax1.ui.theme.Foreground
 import com.example.smsbramkax1.utils.HealthChecker
@@ -38,7 +39,10 @@ fun MainApp() {
                     onMenuClick = {}
                 )
                 when (selectedPage) {
-                    "Dashboard" -> DashboardScreen(onNavigateToHistory = { selectedPage = "Historia SMS" })
+                    "Dashboard" -> DashboardScreen(
+                        onNavigateToHistory = { selectedPage = "Historia SMS" },
+                        onNavigateToSettings = { selectedPage = "Ustawienia" }
+                    )
                     "Historia SMS" -> HistoryScreen(onBack = { selectedPage = "Dashboard" })
                     "Wyślij SMS" -> PlaceholderScreen("Wyślij SMS")
                     "Diagnostyka" -> {
@@ -50,7 +54,7 @@ fun MainApp() {
                             logDao = database.logDao()
                         )
                     }
-                    "Ustawienia" -> PlaceholderScreen("Ustawienia")
+                    "Ustawienia" -> SettingsScreen(onBack = { selectedPage = "Dashboard" })
                     else -> DashboardScreen(onNavigateToHistory = { selectedPage = "Historia SMS" })
                 }
             }
@@ -75,7 +79,10 @@ fun MainApp() {
                     onMenuClick = { scope.launch { drawerState.open() } }
                 )
                 when (selectedPage) {
-                    "Dashboard" -> DashboardScreen(onNavigateToHistory = { selectedPage = "Historia SMS" })
+                    "Dashboard" -> DashboardScreen(
+                        onNavigateToHistory = { selectedPage = "Historia SMS" },
+                        onNavigateToSettings = { selectedPage = "Ustawienia" }
+                    )
                     "Historia SMS" -> HistoryScreen(onBack = { selectedPage = "Dashboard" })
                     "Wyślij SMS" -> PlaceholderScreen("Wyślij SMS")
                     "Diagnostyka" -> {
@@ -87,7 +94,7 @@ fun MainApp() {
                             logDao = database.logDao()
                         )
                     }
-                    "Ustawienia" -> PlaceholderScreen("Ustawienia")
+                    "Ustawienia" -> SettingsScreen(onBack = { selectedPage = "Dashboard" })
                     else -> DashboardScreen(onNavigateToHistory = { selectedPage = "Historia SMS" })
                 }
             }

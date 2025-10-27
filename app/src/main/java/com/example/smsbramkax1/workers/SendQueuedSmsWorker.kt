@@ -8,6 +8,7 @@ import com.example.smsbramkax1.network.NetworkManager
 import com.example.smsbramkax1.sms.SmsManager
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.utils.LogManager
+import com.example.smsbramkax1.utils.Notify
 import com.example.smsbramkax1.utils.SecureStorage
 import kotlinx.coroutines.flow.first
 
@@ -27,6 +28,16 @@ class SendQueuedSmsWorker(
             val networkManager = NetworkManager(baseUrl, apiKey)
             val database = SmsDatabase.getDatabase(applicationContext)
             val smsManager = SmsManager(applicationContext)
+            
+            // Sprawdź stan zdrowia systemu przed rozpoczęciem
+            val failedLastHour = database.smsQueueDao().countFailedSince(System.currentTimeMillis() - 60 * 60 * 1000)
+            if (failedLastHour >= 5) {
+                Notify.error(
+                    applicationContext,
+                    "Wiele błędów wysyłki",
+                    "Ostatnia godzina: $failedLastHour błędów. Sprawdź połączenie i ustawienia."
+                )
+            }
             
             val pendingSms = database.smsQueueDao().getSmsByStatus(SmsStatus.PENDING)
             val scheduledSms = database.smsQueueDao().getSmsByStatus(SmsStatus.SCHEDULED)
@@ -76,6 +87,21 @@ class SendQueuedSmsWorker(
                 }
                 
                 LogManager.log("INFO", "SendQueuedSmsWorker", "SMS sending completed: $sentCount sent, $failedCount failed")
+                
+                // Powiadomienie o dużej liczbie błędów
+                if (failedCount >= 10) {
+                    Notify.error(
+                        applicationContext,
+                        "Krytyczna liczba błędów",
+                        "Nie udało się wysłać $failedCount SMS-ów. Sprawdź logi."
+                    )
+                } else if (failedCount >= 5) {
+                    Notify.error(
+                        applicationContext,
+                        "Wiele błędów wysyłki",
+                        "Nie wysłano $failedCount SMS-ów. Sprawdź połączenie."
+                    )
+                }
             } else {
                 LogManager.log("DEBUG", "SendQueuedSmsWorker", "No SMS to send")
             }

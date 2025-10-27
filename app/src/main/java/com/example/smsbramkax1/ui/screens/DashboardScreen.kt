@@ -12,7 +12,7 @@ import com.example.smsbramkax1.ui.components.*
 import com.example.smsbramkax1.ui.theme.*
 
 @Composable
-fun DashboardScreen(onNavigateToHistory: () -> Unit = {}) {
+fun DashboardScreen(onNavigateToHistory: () -> Unit = {}, onNavigateToSettings: () -> Unit = {}) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -82,7 +82,7 @@ fun DashboardScreen(onNavigateToHistory: () -> Unit = {}) {
 
         // Quick Actions
         item {
-            QuickActions(onNavigateToHistory = onNavigateToHistory)
+            QuickActions(onNavigateToHistory = onNavigateToHistory, onNavigateToSettings = onNavigateToSettings)
         }
     }
 }

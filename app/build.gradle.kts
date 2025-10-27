@@ -41,10 +41,16 @@ android {
         compose = true
     }
     
-    packagingOptions {
-        pickFirsts.add("META-INF/INDEX.LIST")
-        pickFirsts.add("META-INF/io.netty.versions.properties")
-        pickFirsts.add("META-INF/DEPENDENCIES")
+    lint {
+        disable.add("CoroutineCreationDuringComposition")
+    }
+    
+    packaging {
+        resources {
+            pickFirsts.add("META-INF/INDEX.LIST")
+            pickFirsts.add("META-INF/io.netty.versions.properties")
+            pickFirsts.add("META-INF/DEPENDENCIES")
+        }
     }
 }
 
