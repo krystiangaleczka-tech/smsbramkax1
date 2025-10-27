@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    kotlin("kapt")
 }
 
 android {
@@ -38,6 +39,12 @@ android {
     buildFeatures {
         compose = true
     }
+    
+    packagingOptions {
+        pickFirsts.add("META-INF/INDEX.LIST")
+        pickFirsts.add("META-INF/io.netty.versions.properties")
+        pickFirsts.add("META-INF/DEPENDENCIES")
+    }
 }
 
 dependencies {
@@ -49,6 +56,34 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    
+    // Room Database
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
+    
+    // Ktor Server
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.gson)
+    implementation(libs.ktor.server.cors)
+    
+    // Coroutines
+    implementation(libs.kotlinx.coroutines.android)
+    
+    // Gson
+    implementation(libs.gson)
+    
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    
+    // Security
+    implementation(libs.androidx.security.crypto)
+    
+    // Timber
+    implementation(libs.timber)
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

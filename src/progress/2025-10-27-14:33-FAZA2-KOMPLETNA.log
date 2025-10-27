@@ -1,0 +1,102 @@
+# 📦 FAZA 2: BAZA DANYCH (Kotlin + Room + EncryptedStorage) - KOMPLETNA
+
+## ✅ ZROBIONE:
+
+### 1. Konfiguracja Gradle
+- ✅ Dodany plugin KAPT (zamiast KSP)
+- ✅ Dodane dependencies Room, Ktor, Security, Coroutines, Gson, WorkManager, Timber
+- ✅ Dodane packagingOptions dla rozwiązania konfliktów Netty META-INF/INDEX.LIST
+- ✅ Naprawione ostrzeżenie o deprecated fallbackToDestructiveMigration()
+
+### 2. Struktura bazy danych
+- ✅ Utworzono klasę danych SmsMessage.kt z adnotacjami Room
+- ✅ Utworzono klasę danych SystemLog.kt z adnotacjami Room
+- ✅ Wszystkie pola mają domyślne wartości (nullable z domyślnymi)
+
+### 3. DAO (Data Access Objects)
+- ✅ Utworzono SmsDao.kt z pełnym zestawem operacji:
+  - getAllMessages(): Flow<List<SmsMessage>>
+  - getMessagesByStatus(status): Flow<List<SmsMessage>>
+  - getMessageById(id): SmsMessage?
+  - getMessageByExternalId(externalId): SmsMessage?
+  - getPendingMessages(currentTime): List<SmsMessage>
+  - insertMessage(message): Long
+  - updateMessage(message)
+  - deleteMessage(message)
+  - getCountByStatus(status): Flow<Int>
+  - getCountByStatusSince(status, startTime): Flow<Int>
+  - deleteOldMessages(beforeTime): Int
+
+- ✅ Utworzono LogDao.kt z operacjami logowania:
+  - getRecentLogs(limit): Flow<List<SystemLog>>
+  - getLogsByLevel(level, limit): Flow<List<SystemLog>>
+  - getLogsSince(fromTime): List<SystemLog>
+  - insertLog(log)
+  - deleteOldLogs(beforeTime): Int
+  - getErrorCount(): Flow<Int>
+
+### 4. Baza danych Room
+- ✅ Utworzono SmsDatabase.kt z:
+  - Konfiguracją encji (SmsMessage, SystemLog)
+  - Wersją bazy = 1
+  - Singleton pattern z synchronized
+  - Fallback to destructive migration (poprawione)
+  - Metodami dostępu do DAO
+
+### 5. Szyfrowany storage
+- ✅ Utworzono EncryptedStorage.kt z:
+  - MasterKey AES256_GCM
+  - EncryptedSharedPreferences
+  - Metodami do zarządzania tokenem API
+  - Generowaniem nowych tokenów
+
+## 🔧 TECHNICZNE:
+
+### Zmiana KSP → KAPT
+- Użyto pluginu kotlin("kapt") zamiast alias(libs.plugins.ksp)
+- Dependencies Room używają kapt(libs.androidx.room.compiler)
+- KAPT przetwarza adnotacje Room w czasie kompilacji
+
+### Rozwiązanie konfliktów Netty
+- Dodano packagingOptions z pickFirsts dla META-INF plików
+- Rozwiązano konflik INDEX.LIST między bibliotekami Netty
+
+### Poprawki ostrzeżeń
+- Zaktualizowano fallbackToDestructiveMigration(dropAllTables = false)
+- Usunięto deprecated jvmTarget na rzecz compilerOptions
+
+## 📁 STRUKTURA PLIKÓW:
+
+```
+app/src/main/java/com/example/smsbramkax1/
+├── data/
+│   ├── SmsMessage.kt      # Encja wiadomości SMS
+│   └── SystemLog.kt       # Encja logów systemowych
+└── storage/
+    ├── SmsDao.kt          # DAO dla wiadomości SMS
+    ├── LogDao.kt           # DAO dla logów
+    ├── SmsDatabase.kt       # Główna klasa bazy Room
+    └── EncryptedStorage.kt   # Szyfrowany SharedPreferences
+```
+
+## 🏗️ BUILD STATUS:
+- ✅ ./gradlew build - BUILD SUCCESSFUL
+- ✅ ./gradlew assembleDebug - BUILD SUCCESSFUL
+- ✅ Brak błędów kompilacji
+- ✅ KAPT wygenerował kod Room poprawnie
+
+## 📋 NASTĘPNE KROKI:
+1. Integracja bazy danych z MainActivity
+2. Implementacja Repository pattern
+3. Konfiguracja Ktor Server z dostępem do bazy
+4. Implementacja ViewModel z LiveData/Flow
+5. UI z Jetpack Compose
+
+## 🎯 PODSUMOWANIE:
+FAZA 2 zakończona sukcesem. Projekt ma teraz:
+- Pełną konfigurację Room z KAPT
+- Szyfrowany storage dla danych wrażliwych
+- Gotową strukturę DAO do operacji na SMS i logach
+- Rozwiązane problemy z dependencies i buildem
+
+Projekt jest gotowy na dalszy rozwój i integrację z resztą aplikacji.
