@@ -241,13 +241,22 @@ fun SettingsScreen(onBack: () -> Unit = {}) {
         SettingsSection(title = "Optymalizacja baterii") {
             Button(
                 onClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = android.net.Uri.parse("package:${context.packageName}")
+                            }
+                            batteryOptimizationLauncher.launch(intent)
+                        } else {
+                            Toast.makeText(context, "Ta funkcja wymaga Android 6.0+", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Błąd otwierania ustawień: ${e.message}", Toast.LENGTH_LONG).show()
+                        // Fallback to app settings
+                        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = android.net.Uri.parse("package:${context.packageName}")
                         }
-                        batteryOptimizationLauncher.launch(intent)
-                    } else {
-                        Toast.makeText(context, "Ta funkcja wymaga Android 6.0+", Toast.LENGTH_SHORT).show()
+                        context.startActivity(settingsIntent)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

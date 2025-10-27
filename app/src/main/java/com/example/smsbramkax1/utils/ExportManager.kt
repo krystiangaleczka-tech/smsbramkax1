@@ -3,6 +3,7 @@ package com.example.smsbramkax1.utils
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import androidx.core.content.FileProvider
 import com.example.smsbramkax1.data.SmsQueue
 import com.example.smsbramkax1.data.SystemLog
@@ -257,10 +258,13 @@ class ExportManager(private val context: Context) {
     }
     
     private fun createExportFile(fileName: String): File {
-        val exportDir = File(context.getExternalFilesDir(null), EXPORT_DIR)
-        if (!exportDir.exists()) {
-            exportDir.mkdirs()
+        // Use app's external files directory for compatibility with FileProvider
+        val exportDir = File(context.getExternalFilesDir(null), EXPORT_DIR).also {
+            if (!it.exists()) {
+                it.mkdirs()
+            }
         }
+        
         return File(exportDir, fileName)
     }
     

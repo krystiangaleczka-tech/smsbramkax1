@@ -347,6 +347,12 @@ PermissionsManagerComposable(
 - Review database query performance
 - Optimize background task scheduling
 
+### Export Issues
+- Export files are saved to app's external files directory
+- Files are accessible via FileProvider for sharing
+- Check storage permissions if export fails
+- Verify FileProvider configuration in AndroidManifest.xml
+
 ## 📝 Changelog
 
 ### Phase 6 - Complete ✅
