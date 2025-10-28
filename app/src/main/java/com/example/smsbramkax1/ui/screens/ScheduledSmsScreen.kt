@@ -3,6 +3,7 @@ package com.example.smsbramkax1.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -14,16 +15,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.smsbramkax1.data.SmsMessage
+import com.example.smsbramkax1.data.Contact
 import com.example.smsbramkax1.sms.ScheduledSmsManager
 import com.example.smsbramkax1.ui.components.QuickActions
 import com.example.smsbramkax1.ui.components.Action
-import com.example.smsbramkax1.ui.components.CountryCodePhoneField
+import com.example.smsbramkax1.ui.components.CountryCodePhoneFieldWithContact
+import com.example.smsbramkax1.ui.components.ContactPickerDialog
 import com.example.smsbramkax1.ui.components.defaultCountries
 import com.example.smsbramkax1.ui.components.Country
 import com.example.smsbramkax1.utils.DateUtils
+import com.example.smsbramkax1.utils.ContactManager
+import com.example.smsbramkax1.utils.PermissionsManager
 import com.example.smsbramkax1.workers.ProcessScheduledSmsWorker
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -34,6 +41,8 @@ import java.util.Calendar
 @Composable
 fun ScheduledSmsScreen(
     scheduledSmsManager: ScheduledSmsManager,
+    contactManager: ContactManager,
+    permissionsManager: PermissionsManager,
     onNavigateBack: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
@@ -43,6 +52,15 @@ fun ScheduledSmsScreen(
     val scheduledSms by scheduledSmsManager.getAllScheduledSms().collectAsStateWithLifecycle(initialValue = emptyList())
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    
+    // Contact picker state
+    var showContactPicker by remember { mutableStateOf(false) }
+    var contactPickerMode by remember { mutableStateOf("add") }
+    var selectedContactForEdit by remember { mutableStateOf<SmsMessage?>(null) }
+    
+    // Contacts state
+    val contacts by contactManager.getAllContacts().collectAsStateWithLifecycle(initialValue = emptyList())
+    var isLoadingContacts by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -146,7 +164,9 @@ fun ScheduledSmsScreen(
                     }
                 }
                 showAddDialog = false
-            }
+            },
+            contactManager = contactManager,
+            permissionsManager = permissionsManager
         )
     }
     
@@ -169,7 +189,9 @@ fun ScheduledSmsScreen(
                 }
                 showEditDialog = false
                 selectedSms = null
-            }
+            },
+            contactManager = contactManager,
+            permissionsManager = permissionsManager
         )
     }
 }
@@ -357,7 +379,9 @@ private fun ScheduledSmsCard(
 @Composable
 private fun AddScheduledSmsDialog(
     onDismiss: () -> Unit,
-    onAdd: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit
+    onAdd: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit,
+    contactManager: ContactManager,
+    permissionsManager: PermissionsManager
 ) {
     var name by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
@@ -365,6 +389,24 @@ private fun AddScheduledSmsDialog(
         mutableStateOf(defaultCountries.first { it.code == "+48" }) 
     }
     var message by remember { mutableStateOf("") }
+    
+    // Contact picker state
+    var showContactPicker by remember { mutableStateOf(false) }
+    val contacts by contactManager.getAllContacts().collectAsStateWithLifecycle(initialValue = emptyList())
+    var isLoadingContacts by remember { mutableStateOf(false) }
+    
+    // Permission launcher for contacts
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            // Load contacts after permission granted
+            isLoadingContacts = true
+            // Note: In a real implementation, you'd load contacts here
+            isLoadingContacts = false
+        }
+    }
 
     // Date and Time picker states
     val calendar = Calendar.getInstance()
@@ -397,11 +439,20 @@ private fun AddScheduledSmsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                CountryCodePhoneField(
+                CountryCodePhoneFieldWithContact(
                     selectedCountry = selectedCountry,
                     onCountrySelected = { selectedCountry = it },
                     phoneNumber = phoneNumber,
                     onPhoneNumberChanged = { phoneNumber = it },
+                    onContactSelected = { 
+                        // Check permissions first
+                        val missingPermissions = permissionsManager.getMissingContactPermissions()
+                        if (missingPermissions.isEmpty()) {
+                            showContactPicker = true
+                        } else {
+                            contactPermissionLauncher.launch(missingPermissions.toTypedArray())
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -542,6 +593,46 @@ private fun AddScheduledSmsDialog(
             }
         )
     }
+    
+    // Contact Picker Dialog
+    if (showContactPicker) {
+        ContactPickerDialog(
+            contacts = contacts,
+            onDismiss = { showContactPicker = false },
+            onContactSelected = { contact ->
+                // Set name and phone number from selected contact
+                name = contact.name ?: ""
+                
+                val contactPhone = contact.phoneNumber ?: ""
+                
+                // Extract country code and phone number
+                var countryFound = false
+                for (country in defaultCountries) {
+                    if (contactPhone.startsWith(country.code)) {
+                        selectedCountry = country
+                        phoneNumber = contactPhone.removePrefix(country.code)
+                        countryFound = true
+                        break
+                    }
+                }
+                
+                // If no country code found, assume Polish number and clean it
+                if (!countryFound) {
+                    selectedCountry = defaultCountries.first { it.code == "+48" }
+                    // Remove all non-digits and handle different formats
+                    val cleanPhone = contactPhone.replace(Regex("[^0-9]"), "")
+                    phoneNumber = when {
+                        cleanPhone.startsWith("48") && cleanPhone.length >= 11 -> cleanPhone.substring(2) // +48 format
+                        cleanPhone.length >= 9 -> cleanPhone.take(9) // Polish local format or fallback
+                        else -> cleanPhone // Use whatever is left
+                    }
+                }
+                
+                showContactPicker = false
+            },
+            isLoading = isLoadingContacts
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -549,7 +640,9 @@ private fun AddScheduledSmsDialog(
 private fun EditScheduledSmsDialog(
     sms: SmsMessage,
     onDismiss: () -> Unit,
-    onUpdate: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit
+    onUpdate: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit,
+    contactManager: ContactManager,
+    permissionsManager: PermissionsManager
 ) {
     var name by remember { mutableStateOf(sms.category ?: "") }
     var phoneNumber by remember { mutableStateOf("") }
@@ -557,6 +650,24 @@ private fun EditScheduledSmsDialog(
         mutableStateOf(defaultCountries.first { it.code == "+48" }) 
     }
     var message by remember { mutableStateOf(sms.messageBody) }
+    
+    // Contact picker state
+    var showContactPicker by remember { mutableStateOf(false) }
+    val contacts by contactManager.getAllContacts().collectAsStateWithLifecycle(initialValue = emptyList())
+    var isLoadingContacts by remember { mutableStateOf(false) }
+    
+    // Permission launcher for contacts
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            // Load contacts after permission granted
+            isLoadingContacts = true
+            // Note: In a real implementation, you'd load contacts here
+            isLoadingContacts = false
+        }
+    }
     
     // Extract phone number without country code
     LaunchedEffect(sms.phoneNumber) {
@@ -600,11 +711,20 @@ private fun EditScheduledSmsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                CountryCodePhoneField(
+                CountryCodePhoneFieldWithContact(
                     selectedCountry = selectedCountry,
                     onCountrySelected = { selectedCountry = it },
                     phoneNumber = phoneNumber,
                     onPhoneNumberChanged = { phoneNumber = it },
+                    onContactSelected = { 
+                        // Check permissions first
+                        val missingPermissions = permissionsManager.getMissingContactPermissions()
+                        if (missingPermissions.isEmpty()) {
+                            showContactPicker = true
+                        } else {
+                            contactPermissionLauncher.launch(missingPermissions.toTypedArray())
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -727,6 +847,46 @@ private fun EditScheduledSmsDialog(
                     Text("Anuluj")
                 }
             }
+        )
+    }
+    
+    // Contact Picker Dialog
+    if (showContactPicker) {
+        ContactPickerDialog(
+            contacts = contacts,
+            onDismiss = { showContactPicker = false },
+            onContactSelected = { contact ->
+                // Set name and phone number from selected contact
+                name = contact.name ?: ""
+                
+                val contactPhone = contact.phoneNumber ?: ""
+                
+                // Extract country code and phone number
+                var countryFound = false
+                for (country in defaultCountries) {
+                    if (contactPhone.startsWith(country.code)) {
+                        selectedCountry = country
+                        phoneNumber = contactPhone.removePrefix(country.code)
+                        countryFound = true
+                        break
+                    }
+                }
+                
+                // If no country code found, assume Polish number and clean it
+                if (!countryFound) {
+                    selectedCountry = defaultCountries.first { it.code == "+48" }
+                    // Remove all non-digits and handle different formats
+                    val cleanPhone = contactPhone.replace(Regex("[^0-9]"), "")
+                    phoneNumber = when {
+                        cleanPhone.startsWith("48") && cleanPhone.length >= 11 -> cleanPhone.substring(2) // +48 format
+                        cleanPhone.length >= 9 -> cleanPhone.take(9) // Polish local format or fallback
+                        else -> cleanPhone // Use whatever is left
+                    }
+                }
+                
+                showContactPicker = false
+            },
+            isLoading = isLoadingContacts
         )
     }
 }

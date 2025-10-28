@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,6 +61,46 @@ fun CountryCodePhoneField(
     onPhoneNumberChanged: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    CountryCodePhoneFieldInternal(
+        selectedCountry = selectedCountry,
+        onCountrySelected = onCountrySelected,
+        phoneNumber = phoneNumber,
+        onPhoneNumberChanged = onPhoneNumberChanged,
+        onContactSelected = null,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CountryCodePhoneFieldWithContact(
+    selectedCountry: Country,
+    onCountrySelected: (Country) -> Unit,
+    phoneNumber: String,
+    onPhoneNumberChanged: (String) -> Unit,
+    onContactSelected: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    CountryCodePhoneFieldInternal(
+        selectedCountry = selectedCountry,
+        onCountrySelected = onCountrySelected,
+        phoneNumber = phoneNumber,
+        onPhoneNumberChanged = onPhoneNumberChanged,
+        onContactSelected = onContactSelected,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CountryCodePhoneFieldInternal(
+    selectedCountry: Country,
+    onCountrySelected: (Country) -> Unit,
+    phoneNumber: String,
+    onPhoneNumberChanged: (String) -> Unit,
+    onContactSelected: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
     var expanded by remember { mutableStateOf(false) }
     
     Box(modifier = modifier) {
@@ -97,7 +138,21 @@ fun CountryCodePhoneField(
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
-            }
+            },
+            trailingIcon = if (onContactSelected != null) {
+                {
+                    IconButton(
+                        onClick = onContactSelected,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = "Wybierz kontakt",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            } else null
         )
         
         DropdownMenu(

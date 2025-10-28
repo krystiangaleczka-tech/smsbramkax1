@@ -27,6 +27,8 @@ class ContactManager private constructor(private val context: Context) {
         }
     }
     
+    fun getAllContacts() = contactDao.getAllContacts()
+    
     suspend fun syncContacts(): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {

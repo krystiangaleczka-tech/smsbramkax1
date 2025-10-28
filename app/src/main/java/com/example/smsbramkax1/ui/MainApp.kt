@@ -57,8 +57,12 @@ fun MainApp() {
                     "Zaplanowane SMS" -> {
                         val context = LocalContext.current
                         val scheduledSmsManager = ScheduledSmsManager.getInstance(context)
+                        val contactManager = ContactManager.getInstance(context)
+                        val permissionsManager = PermissionsManager(context)
                         ScheduledSmsScreen(
                             scheduledSmsManager = scheduledSmsManager,
+                            contactManager = contactManager,
+                            permissionsManager = permissionsManager,
                             onNavigateBack = { selectedPage = "Dashboard" }
                         )
                     }
@@ -132,8 +136,12 @@ fun MainApp() {
                     "Zaplanowane SMS" -> {
                         val context = LocalContext.current
                         val scheduledSmsManager = ScheduledSmsManager.getInstance(context)
+                        val contactManager = ContactManager.getInstance(context)
+                        val permissionsManager = PermissionsManager(context)
                         ScheduledSmsScreen(
                             scheduledSmsManager = scheduledSmsManager,
+                            contactManager = contactManager,
+                            permissionsManager = permissionsManager,
                             onNavigateBack = { selectedPage = "Dashboard" }
                         )
                     }
