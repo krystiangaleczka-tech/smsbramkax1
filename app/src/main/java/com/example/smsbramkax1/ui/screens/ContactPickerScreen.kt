@@ -11,10 +11,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.smsbramkax1.data.Contact
 import com.example.smsbramkax1.ui.components.QuickActions
 import com.example.smsbramkax1.utils.ContactManager
@@ -29,9 +32,11 @@ fun ContactPickerScreen(
     onNavigateBack: () -> Unit,
     onContactsSelected: (List<String>) -> Unit
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedContacts by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showSyncDialog by remember { mutableStateOf(false) }
+    var showPermissionRationale by remember { mutableStateOf(false) }
     
     var contacts by remember { mutableStateOf<List<Contact>>(emptyList()) }
     
@@ -40,6 +45,21 @@ fun ContactPickerScreen(
     }
     
     val coroutineScope = rememberCoroutineScope()
+    
+    // Launcher for contacts permission
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // Permission granted, refresh contacts
+            coroutineScope.launch {
+                contacts = contactManager.getContactsWithPhone()
+            }
+        } else {
+            // Permission denied, show rationale
+            showPermissionRationale = true
+        }
+    }
     
     // Handle search
     LaunchedEffect(searchQuery) {
@@ -106,7 +126,14 @@ fun ContactPickerScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Button(
-                            onClick = { showSyncDialog = true }
+                            onClick = { 
+                                val missingPermissions = permissionsManager.getMissingContactPermissions()
+                                if (missingPermissions.isNotEmpty()) {
+                                    contactsPermissionLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+                                } else {
+                                    showSyncDialog = true
+                                }
+                            }
                         ) {
                             Text("Synchronizuj kontakty")
                         }
@@ -131,31 +158,53 @@ fun ContactPickerScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = { showSyncDialog = true },
-                        modifier = Modifier.weight(1f)
+                    OutlinedButton(
+                        onClick = { 
+                            val missingPermissions = permissionsManager.getMissingContactPermissions()
+                            if (missingPermissions.isNotEmpty()) {
+                                contactsPermissionLauncher.launch(android.Manifest.permission.READ_CONTACTS)
+                            } else {
+                                showSyncDialog = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Icon(
+                            Icons.Default.Refresh, 
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Synchronizuj")
+                        Text("Sync", style = MaterialTheme.typography.bodySmall)
                     }
-                    Button(
+                    OutlinedButton(
                         onClick = { 
                             selectedContacts = contacts.mapNotNull { it.phoneNumber }.toSet()
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Icon(
+                            Icons.Default.CheckCircle, 
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Zaznacz wszystkie")
+                        Text("Zaznacz", style = MaterialTheme.typography.bodySmall)
                     }
-                    Button(
+                    OutlinedButton(
                         onClick = { selectedContacts = emptySet() },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.Clear, contentDescription = null)
+                        Icon(
+                            Icons.Default.Clear, 
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Wyczyść")
+                        Text("Wyczyść", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 
@@ -217,9 +266,40 @@ fun ContactPickerScreen(
             onDismiss = { showSyncDialog = false },
             onSync = {
                 coroutineScope.launch {
-                    contactManager.syncContacts()
+                    val result = contactManager.syncContacts()
+                    result.onSuccess { count ->
+                        // Refresh contacts after successful sync
+                        contacts = contactManager.getContactsWithPhone()
+                    }
                 }
                 showSyncDialog = false
+            }
+        )
+    }
+    
+    if (showPermissionRationale) {
+        AlertDialog(
+            onDismissRequest = { showPermissionRationale = false },
+            title = { Text("Odmowa uprawnień") },
+            text = { 
+                Text(
+                    "Aplikacja wymaga uprawnienia do odczytu kontaktów, aby zsynchronizować kontakty z urządzenia. " +
+                    "Bez tego uprawnienia nie można wyświetlić ani zsynchronizować kontaktów.\n\n" +
+                    "Przejdź do ustawień aplikacji i przyznaj uprawnienie do kontaktów ręcznie."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { 
+                    context.startActivity(permissionsManager.getAppSettingsIntent())
+                    showPermissionRationale = false
+                }) {
+                    Text("Ustawienia")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionRationale = false }) {
+                    Text("Anuluj")
+                }
             }
         )
     }

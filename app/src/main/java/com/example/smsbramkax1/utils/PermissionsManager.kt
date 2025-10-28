@@ -41,7 +41,8 @@ class PermissionsManager(private val context: Context) {
         
         val OPTIONAL_PERMISSIONS = arrayOf(
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.READ_CONTACTS
         )
     }
     
@@ -72,6 +73,13 @@ class PermissionsManager(private val context: Context) {
     
     fun hasContactsPermission(): Boolean {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+    }
+    
+    fun getMissingContactPermissions(): List<String> {
+        val contactPermissions = listOf(Manifest.permission.READ_CONTACTS)
+        return contactPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
     }
     
     fun getMissingPermissions(): List<String> {
