@@ -3,8 +3,7 @@ package com.example.smsbramkax1.workers
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.smsbramkax1.data.SmsQueue
-import com.example.smsbramkax1.data.SmsStatus
+import com.example.smsbramkax1.data.SmsMessage
 import com.example.smsbramkax1.network.NetworkManager
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.utils.LogManager
@@ -33,21 +32,19 @@ class FetchPendingSmsWorker(
             if (pendingSms.isNotEmpty()) {
                 var insertedCount = 0
                 pendingSms.forEach { smsDto ->
-                    val existingSms = database.smsQueueDao().getSmsById(smsDto.id)
+                    val existingSms = database.smsMessageDao().getSmsById(smsDto.id)
                     if (existingSms == null) {
-                        val smsQueue = SmsQueue(
+                        val isScheduled = smsDto.scheduledAt != null && smsDto.scheduledAt > System.currentTimeMillis()
+                        val smsMessage = SmsMessage(
                             id = smsDto.id,
                             phoneNumber = smsDto.phoneNumber,
-                            message = smsDto.message,
-                            status = if (smsDto.scheduledAt != null && smsDto.scheduledAt > System.currentTimeMillis()) {
-                                SmsStatus.SCHEDULED
-                            } else {
-                                SmsStatus.PENDING
-                            },
+                            messageBody = smsDto.message,
+                            status = if (isScheduled) "SCHEDULED" else "PENDING",
                             priority = smsDto.priority,
-                            scheduledAt = smsDto.scheduledAt
+                            scheduledFor = smsDto.scheduledAt,
+                            isScheduled = isScheduled
                         )
-                        database.smsQueueDao().insertSms(smsQueue)
+                        database.smsMessageDao().insertSms(smsMessage)
                         insertedCount++
                     }
                 }

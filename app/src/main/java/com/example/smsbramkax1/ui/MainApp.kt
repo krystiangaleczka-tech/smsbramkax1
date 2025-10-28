@@ -92,7 +92,7 @@ fun MainApp() {
                     "Diagnostyka" -> {
                         val context = LocalContext.current
                         val database = SmsDatabase.getDatabase(context)
-                        val healthChecker = HealthChecker(context, database.smsQueueDao())
+                        val healthChecker = HealthChecker(context, database.smsMessageDao())
                         DiagnosticsScreen(
                             healthChecker = healthChecker,
                             logDao = database.logDao()
@@ -167,7 +167,7 @@ fun MainApp() {
                     "Diagnostyka" -> {
                         val context = LocalContext.current
                         val database = SmsDatabase.getDatabase(context)
-                        val healthChecker = HealthChecker(context, database.smsQueueDao())
+                        val healthChecker = HealthChecker(context, database.smsMessageDao())
                         DiagnosticsScreen(
                             healthChecker = healthChecker,
                             logDao = database.logDao()

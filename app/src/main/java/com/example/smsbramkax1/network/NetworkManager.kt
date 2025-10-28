@@ -3,7 +3,6 @@
 package com.example.smsbramkax1.network
 
 import com.example.smsbramkax1.dto.*
-import com.example.smsbramkax1.data.ScheduledSmsStatus
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.android.*

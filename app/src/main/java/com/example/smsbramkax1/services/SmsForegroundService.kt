@@ -105,9 +105,9 @@ class SmsForegroundService : Service() {
         serviceScope.launch {
             try {
                 val database = SmsDatabase.getDatabase(applicationContext)
-                val pendingCount = database.smsQueueDao().getSmsCountByStatus(com.example.smsbramkax1.data.SmsStatus.PENDING).first()
-                val scheduledCount = database.smsQueueDao().getSmsCountByStatus(com.example.smsbramkax1.data.SmsStatus.SCHEDULED).first()
-                val failedCount = database.smsQueueDao().getSmsCountByStatus(com.example.smsbramkax1.data.SmsStatus.FAILED).first()
+                val pendingCount = database.smsMessageDao().getCountByStatus("PENDING")
+                val scheduledCount = database.smsMessageDao().getCountByStatus("SCHEDULED")
+                val failedCount = database.smsMessageDao().getCountByStatus("FAILED")
                 
                 val contentText = "Oczekujące: $pendingCount | Zaplanowane: $scheduledCount | Błędy: $failedCount"
                 

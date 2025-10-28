@@ -41,15 +41,15 @@ fun MessageTable(onShowAllHistory: () -> Unit = {}) {
         scope.launch {
             try {
                 val database = SmsDatabase.getDatabase(context)
-                val recentSms = database.smsQueueDao().getRecentSms(10).first()
+                val recentSms = database.smsMessageDao().getRecentSms(10)
                 
-                messages = recentSms.map { sms: com.example.smsbramkax1.data.SmsQueue ->
+                messages = recentSms.map { sms: com.example.smsbramkax1.data.SmsMessage ->
                     val timeAgo = getTimeAgo(sms.createdAt)
                     SmsMessage(
                         id = "#${sms.id}",
                         number = maskPhoneNumber(sms.phoneNumber),
                         message = sms.message.take(30) + if (sms.message.length > 30) "..." else "",
-                        status = sms.status.name,
+                        status = sms.status,
                         time = timeAgo
                     )
                 }

@@ -1,7 +1,6 @@
 package com.example.smsbramkax1.dto
 
 import kotlinx.serialization.Serializable
-import com.example.smsbramkax1.data.ScheduledSmsStatus
 
 @Serializable
 data class ScheduledSmsRequestDTO(
@@ -18,7 +17,7 @@ data class ScheduledSmsResponseDTO(
     val phoneNumber: String,
     val messageBody: String,
     val scheduledFor: Long,
-    val status: ScheduledSmsStatus,
+    val status: String, // Now using String instead of ScheduledSmsStatus
     val createdAt: Long,
     val updatedAt: Long?,
     val sentAt: Long?,

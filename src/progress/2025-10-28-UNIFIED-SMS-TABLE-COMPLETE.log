@@ -1,0 +1,118 @@
+# SESJA ROZWOJOWA: UNIFIED SMS TABLE - KOMPLETNA IMPLEMENTACJA
+# Data: 2025-10-28
+# Status: ZAKOŃCZONO SUKCESEM ✅
+
+## PROBLEM GŁÓWNY:
+Użytkownik zgłosił, że po wysłaniu zaplanowanego SMS-a, znika on z listy zaplanowanych i pojawia się tylko w historii. 
+Chciał aby zaplanowane SMS-y pokazywały WSZYSTKIE zaplanowane wiadomości (zarówno przyszłe jak i wysłane).
+
+## ETAPY SESJI:
+
+### 1. UNIFIED SMS TABLE MIGRATION (FAZA 1)
+**Problem:** Dwie oddzielne tabele `scheduled_sms` i `sms_queue` powodowały rozproszenie danych
+**Rozwiązanie:** Połączenie w jedną tabelę `sms_messages` z polem `isScheduled`
+
+**Zmiany:**
+- SmsMessage.kt: Dodano `isScheduled: Boolean`, `scheduledFor: Long?`, `scheduledAt: Long?`
+- SmsMessageDao.kt: Połączono funkcje z obu tabel w jedną unified DAO
+- SmsDatabase.kt: Update wersji bazy 2→3, usunięcie starych DAO
+- SmsManager.kt: Użycie unified table, return `Result<Long>`
+- ScheduledSmsManager.kt: Użycie unified table z `isScheduled=true`
+
+### 2. CORE COMPONENTS UPDATE (FAZA 2)
+**Zmienione pliki:**
+- BulkSmsManager.kt: Update do unified table
+- QuickActions.kt: Poprawki test SMS i export
+- MessageTable.kt: Update do unified table
+- ErrorHandler.kt: Update retry functions
+- ExportManager.kt: Update import/export
+- HealthChecker.kt: Update health checks
+- Wszystkie Workery: Update do unified table
+
+### 3. DATE/TIME PICKERS FIX (FAZA 3)
+**Problem:** Prefiksy w data/time pickerach
+**Rozwiązanie:** Poprawki formatowania i obsługi dat
+
+### 4. FINAL FIX - SCHEDULED SMS LIST (FAZA 4)
+**Problem:** Lista zaplanowanych pokazywała tylko przyszłe SMS-y
+**Rozwiązanie:** Zmiana zapytania aby pokazywać WSZYSTKIE zaplanowane SMS-y
+
+**Kluczowe zmiany:**
+```kotlin
+// PRZED: Tylko przyszłe
+@Query("SELECT * FROM sms_messages WHERE isScheduled = 1 AND status IN ('SCHEDULED', 'QUEUED') ORDER BY scheduledFor ASC")
+
+// PO: Wszystkie zaplanowane  
+@Query("SELECT * FROM sms_messages WHERE isScheduled = 1 ORDER BY scheduledFor DESC")
+```
+
+**UI Improvements:**
+- Dodanie ikon statusów (📍 Zaplanowany, ✅ Wysłany, ❌ Błąd)
+- Pokazywanie daty planowanej I daty wysłania
+- Przyciski akcji (Edytuj, Anuluj, Ponów)
+- Różne kolory dla statusów
+
+## TECHNICZNE PODSUMOWANIE:
+
+### Database Changes:
+- Tabele: 5 → 4 (usunięto ScheduledSms, SmsQueue)
+- DAO: 4 → 1 (unified SmsMessageDao)
+- Wersja: 2 → 3
+- Entity: SmsMessage z polem `isScheduled`
+
+### Files Modified:
+1. **Core Data Layer:**
+   - SmsMessage.kt (unified entity)
+   - SmsMessageDao.kt (unified DAO)
+   - SmsDatabase.kt (database config)
+
+2. **SMS Managers:**
+   - SmsManager.kt (regular SMS)
+   - ScheduledSmsManager.kt (scheduled SMS)
+   - BulkSmsManager.kt (bulk SMS)
+
+3. **UI Components:**
+   - ScheduledSmsScreen.kt (main fix)
+   - HistoryScreen.kt
+   - MessageTable.kt
+   - QuickActions.kt
+
+4. **Utils & Workers:**
+   - ErrorHandler.kt
+   - ExportManager.kt
+   - HealthChecker.kt
+   - All Workers (SendQueuedSmsWorker, FetchPendingSmsWorker, etc.)
+
+5. **Services:**
+   - SmsForegroundService.kt
+   - MainApp.kt
+   - MainContent.kt
+
+## WYNIK KOŃCOWY:
+
+### ✅ Problem rozwiązany:
+1. **Historia SMS:** Pokazuje WSZYSTKIE wysłane SMS-y (regularne + zaplanowane)
+2. **Zaplanowane SMS:** Pokazuje WSZYSTKIE zaplanowane SMS-y (przyszłe + wysłane)
+
+### ✅ Użytkownik może:
+- Widzieć pełną historię zaplanowanych wiadomości
+- Odróżniać statusy (ikony + kolory)
+- Sprawdzać daty planowania i wysłania
+- Zarządzać zaplanowanymi SMS-ami (edytuj, anuluj, ponów)
+
+### ✅ Technical Benefits:
+- Single source of truth dla SMS-ów
+- Brak duplikacji danych
+- Lepsza wydajność bazy
+- Uproszczone zapytania
+- Spójność danych
+
+## TESTOWANIE:
+- Build: ✅ SUCCESSFUL
+- Install: ✅ SUCCESSFUL  
+- Functionality: ✅ Potwierdzona przez użytkownika
+
+## PODSUMOWANIE SESJI:
+Pełna migracja na unified SMS table z poprawkami UI dla listy zaplanowanych.
+Wszystkie funkcje działają poprawnie, problem użytkownika rozwiązany.
+Aplikacja gotowa do produkcji.

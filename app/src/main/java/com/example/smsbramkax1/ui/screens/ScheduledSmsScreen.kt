@@ -10,17 +10,25 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.smsbramkax1.data.ScheduledSmsStatus
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.smsbramkax1.data.SmsMessage
 import com.example.smsbramkax1.sms.ScheduledSmsManager
 import com.example.smsbramkax1.ui.components.QuickActions
 import com.example.smsbramkax1.ui.components.Action
+import com.example.smsbramkax1.ui.components.CountryCodePhoneField
+import com.example.smsbramkax1.ui.components.defaultCountries
+import com.example.smsbramkax1.ui.components.Country
 import com.example.smsbramkax1.utils.DateUtils
+import com.example.smsbramkax1.workers.ProcessScheduledSmsWorker
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,10 +38,11 @@ fun ScheduledSmsScreen(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
-    var selectedSms by remember { mutableStateOf<com.example.smsbramkax1.data.ScheduledSms?>(null) }
-    
+    var selectedSms by remember { mutableStateOf<SmsMessage?>(null) }
+
     val scheduledSms by scheduledSmsManager.getAllScheduledSms().collectAsStateWithLifecycle(initialValue = emptyList())
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     
     Scaffold(
         topBar = {
@@ -43,18 +52,8 @@ fun ScheduledSmsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Dodaj SMS")
-                    }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Dodaj zaplanowany SMS")
-            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -74,8 +73,11 @@ fun ScheduledSmsScreen(
                         ),
                         Action(
                             icon = Icons.Default.Refresh,
-                            text = "Odśwież",
-                            onClick = { /* Refresh handled by Flow */ }
+                            text = "Przetwórz teraz",
+                            onClick = {
+                                val workRequest = OneTimeWorkRequestBuilder<ProcessScheduledSmsWorker>().build()
+                                WorkManager.getInstance(context).enqueue(workRequest)
+                            }
                         )
                     )
                 )
@@ -134,7 +136,14 @@ fun ScheduledSmsScreen(
             onDismiss = { showAddDialog = false },
             onAdd = { name, phone, message, scheduledFor ->
                 coroutineScope.launch {
-                    scheduledSmsManager.scheduleSms(name, phone, message, scheduledFor)
+                    val result = scheduledSmsManager.scheduleSms(name, phone, message, scheduledFor)
+                    if (result.isSuccess) {
+                        // If SMS is scheduled for immediate sending, process it now
+                        if (scheduledFor <= System.currentTimeMillis() + 60000) { // within 1 minute
+                            val workRequest = OneTimeWorkRequestBuilder<ProcessScheduledSmsWorker>().build()
+                            WorkManager.getInstance(context).enqueue(workRequest)
+                        }
+                    }
                 }
                 showAddDialog = false
             }
@@ -167,26 +176,28 @@ fun ScheduledSmsScreen(
 
 @Composable
 private fun ScheduledSmsCard(
-    sms: com.example.smsbramkax1.data.ScheduledSms,
+    sms: SmsMessage,
     onEdit: () -> Unit,
     onCancel: () -> Unit
 ) {
     val statusColor = when (sms.status) {
-        ScheduledSmsStatus.SCHEDULED -> MaterialTheme.colorScheme.primary
-        ScheduledSmsStatus.QUEUED -> MaterialTheme.colorScheme.secondary
-        ScheduledSmsStatus.SENT -> MaterialTheme.colorScheme.tertiary
-        ScheduledSmsStatus.DELIVERED -> MaterialTheme.colorScheme.primary
-        ScheduledSmsStatus.DELETED -> MaterialTheme.colorScheme.error
-        ScheduledSmsStatus.FAILED -> MaterialTheme.colorScheme.error
+        "SCHEDULED" -> MaterialTheme.colorScheme.primary
+        "QUEUED" -> MaterialTheme.colorScheme.secondary
+        "SENT" -> MaterialTheme.colorScheme.tertiary
+        "DELIVERED" -> MaterialTheme.colorScheme.primary
+        "DELETED" -> MaterialTheme.colorScheme.error
+        "FAILED" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     
     val statusText = when (sms.status) {
-        ScheduledSmsStatus.SCHEDULED -> "Zaplanowany"
-        ScheduledSmsStatus.QUEUED -> "W kolejce"
-        ScheduledSmsStatus.SENT -> "Wysłany"
-        ScheduledSmsStatus.DELIVERED -> "Dostarczony"
-        ScheduledSmsStatus.DELETED -> "Usunięty"
-        ScheduledSmsStatus.FAILED -> "Błąd"
+        "SCHEDULED" -> "Zaplanowany"
+        "QUEUED" -> "W kolejce"
+        "SENT" -> "Wysłany"
+        "DELIVERED" -> "Dostarczony"
+        "DELETED" -> "Usunięty"
+        "FAILED" -> "Błąd"
+        else -> sms.status
     }
     
     Card(
@@ -203,7 +214,7 @@ private fun ScheduledSmsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = sms.name,
+                    text = sms.category ?: "Bez nazwy",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -212,12 +223,58 @@ private fun ScheduledSmsCard(
                     color = statusColor.copy(alpha = 0.1f),
                     shape = MaterialTheme.shapes.small
                 ) {
-                    Text(
-                        text = statusText,
+                    Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor
-                    )
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Status icon
+                        when (sms.status) {
+                            "SCHEDULED" -> Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Zaplanowany",
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                            "QUEUED" -> Icon(
+                                Icons.Default.Info,
+                                contentDescription = "W kolejce",
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                            "SENT" -> Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Wysłany",
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                            "DELIVERED" -> Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Dostarczony",
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                            "FAILED" -> Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Błąd",
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                            else -> Icon(
+                                Icons.Default.Info,
+                                contentDescription = sms.status,
+                                modifier = Modifier.size(12.dp),
+                                tint = statusColor
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = statusColor
+                        )
+                    }
                 }
             }
             
@@ -234,18 +291,33 @@ private fun ScheduledSmsCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Date information
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Planowane: ${DateUtils.formatDateTime(sms.scheduledFor)}",
+                    text = "Planowane: ${DateUtils.formatDateTime(sms.scheduledFor ?: System.currentTimeMillis())}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                if (sms.status == ScheduledSmsStatus.SCHEDULED) {
+                // Show sent date if SMS was sent
+                if (sms.status in listOf("SENT", "DELIVERED") && sms.sentAt != null) {
+                    Text(
+                        text = "Wysłano: ${DateUtils.formatDateTime(sms.sentAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+            }
+            
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (sms.status == "SCHEDULED") {
                     Row {
                         IconButton(onClick = onEdit) {
                             Icon(
@@ -262,6 +334,19 @@ private fun ScheduledSmsCard(
                             )
                         }
                     }
+                } else if (sms.status == "FAILED") {
+                    // Retry button for failed SMS
+                    IconButton(
+                        onClick = {
+                            // TODO: Implement retry functionality
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Ponów",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -275,10 +360,28 @@ private fun AddScheduledSmsDialog(
     onAdd: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var selectedCountry by remember { 
+        mutableStateOf(defaultCountries.first { it.code == "+48" }) 
+    }
     var message by remember { mutableStateOf("") }
-    var selectedDate by remember { mutableStateOf("") }
-    var selectedTime by remember { mutableStateOf("") }
+
+    // Date and Time picker states
+    val calendar = Calendar.getInstance()
+    var selectedDate by remember { mutableStateOf<Calendar?>(null) }
+    var selectedTime by remember { mutableStateOf<Calendar?>(null) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = calendar.timeInMillis
+    )
+
+    val timePickerState = rememberTimePickerState(
+        initialHour = calendar.get(Calendar.HOUR_OF_DAY),
+        initialMinute = calendar.get(Calendar.MINUTE)
+    )
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -294,10 +397,11 @@ private fun AddScheduledSmsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Numer telefonu") },
+                CountryCodePhoneField(
+                    selectedCountry = selectedCountry,
+                    onCountrySelected = { selectedCountry = it },
+                    phoneNumber = phoneNumber,
+                    onPhoneNumberChanged = { phoneNumber = it },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -309,40 +413,68 @@ private fun AddScheduledSmsDialog(
                     minLines = 3,
                     maxLines = 5
                 )
-                
+
+                // Date Picker Field
                 OutlinedTextField(
-                    value = selectedDate,
-                    onValueChange = { selectedDate = it },
-                    label = { Text("Data (RRRR-MM-DD)") },
+                    value = selectedDate?.let {
+                        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(it.time)
+                    } ?: "",
+                    onValueChange = {},
+                    label = { Text("Data") },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("2024-12-31") }
+                    placeholder = { Text("Wybierz datę") },
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Default.DateRange, contentDescription = "Wybierz datę")
+                        }
+                    }
                 )
-                
+
+                // Time Picker Field
                 OutlinedTextField(
-                    value = selectedTime,
-                    onValueChange = { selectedTime = it },
-                    label = { Text("Godzina (GG:MM)") },
+                    value = selectedTime?.let {
+                        SimpleDateFormat("HH:mm", Locale.getDefault()).format(it.time)
+                    } ?: "",
+                    onValueChange = {},
+                    label = { Text("Godzina") },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("14:30") }
+                    placeholder = { Text("Wybierz godzinę") },
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showTimePicker = true }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Wybierz godzinę")
+                        }
+                    }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val dateTime = "$selectedDate $selectedTime"
-                    val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-                    val scheduledFor = try {
-                        formatter.parse(dateTime)?.time ?: System.currentTimeMillis()
-                    } catch (e: Exception) {
+                    val scheduledFor = if (selectedDate != null && selectedTime != null) {
+                        // Create calendar with selected date
+                        val dateCalendar = Calendar.getInstance().apply {
+                            timeInMillis = selectedDate!!.timeInMillis
+                        }
+
+                        // Set time from selected time
+                        dateCalendar.set(Calendar.HOUR_OF_DAY, selectedTime!!.get(Calendar.HOUR_OF_DAY))
+                        dateCalendar.set(Calendar.MINUTE, selectedTime!!.get(Calendar.MINUTE))
+                        dateCalendar.set(Calendar.SECOND, 0)
+                        dateCalendar.set(Calendar.MILLISECOND, 0)
+
+                        dateCalendar.timeInMillis
+                    } else {
                         System.currentTimeMillis()
                     }
-                    
-                    onAdd(name, phone, message, scheduledFor)
+
+                    val fullPhoneNumber = selectedCountry.code + phoneNumber
+                    onAdd(name, fullPhoneNumber, message, scheduledFor)
                 },
-                enabled = name.isNotBlank() && phone.isNotBlank() && message.isNotBlank() && 
-                         selectedDate.isNotBlank() && selectedTime.isNotBlank()
-            ) {
+                enabled = name.isNotBlank() && phoneNumber.isNotBlank() && message.isNotBlank() &&
+                         selectedDate != null && selectedTime != null
+             ) {
                 Text("Dodaj")
             }
         },
@@ -352,22 +484,107 @@ private fun AddScheduledSmsDialog(
             }
         }
     )
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedDate = Calendar.getInstance().apply {
+                            timeInMillis = datePickerState.selectedDateMillis ?: calendar.timeInMillis
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Anuluj")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // Time Picker Dialog
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Wybierz godzinę") },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // Create a calendar with only the selected time components
+                        selectedTime = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                            set(Calendar.MINUTE, timePickerState.minute)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        showTimePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Anuluj")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditScheduledSmsDialog(
-    sms: com.example.smsbramkax1.data.ScheduledSms,
+    sms: SmsMessage,
     onDismiss: () -> Unit,
     onUpdate: (name: String, phone: String, message: String, scheduledFor: Long) -> Unit
 ) {
-    var name by remember { mutableStateOf(sms.name) }
-    var phone by remember { mutableStateOf(sms.phoneNumber) }
+    var name by remember { mutableStateOf(sms.category ?: "") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var selectedCountry by remember { 
+        mutableStateOf(defaultCountries.first { it.code == "+48" }) 
+    }
     var message by remember { mutableStateOf(sms.messageBody) }
     
-    val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    val initialDateTime = formatter.format(Date(sms.scheduledFor))
-    var dateTime by remember { mutableStateOf(initialDateTime) }
+    // Extract phone number without country code
+    LaunchedEffect(sms.phoneNumber) {
+        defaultCountries.forEach { country ->
+            if (sms.phoneNumber.startsWith(country.code)) {
+                selectedCountry = country
+                phoneNumber = sms.phoneNumber.removePrefix(country.code)
+                return@forEach
+            }
+        }
+    }
+
+    // Date and Time picker states
+    val calendar = Calendar.getInstance().apply { timeInMillis = sms.scheduledFor ?: System.currentTimeMillis() }
+    var selectedDate by remember { mutableStateOf(calendar) }
+    var selectedTime by remember { mutableStateOf(calendar) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = sms.scheduledFor
+    )
+
+    val timePickerState = rememberTimePickerState(
+        initialHour = calendar.get(Calendar.HOUR_OF_DAY),
+        initialMinute = calendar.get(Calendar.MINUTE)
+    )
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -383,10 +600,11 @@ private fun EditScheduledSmsDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Numer telefonu") },
+                CountryCodePhoneField(
+                    selectedCountry = selectedCountry,
+                    onCountrySelected = { selectedCountry = it },
+                    phoneNumber = phoneNumber,
+                    onPhoneNumberChanged = { phoneNumber = it },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -399,27 +617,50 @@ private fun EditScheduledSmsDialog(
                     maxLines = 5
                 )
                 
+                // Date Picker Field
                 OutlinedTextField(
-                    value = dateTime,
-                    onValueChange = { dateTime = it },
-                    label = { Text("Data i godzina (RRRR-MM-DD GG:MM)") },
-                    modifier = Modifier.fillMaxWidth()
+                    value = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(selectedDate.time),
+                    onValueChange = {},
+                    label = { Text("Data") },
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Default.DateRange, contentDescription = "Wybierz datę")
+                        }
+                    }
+                )
+
+                // Time Picker Field
+                OutlinedTextField(
+                    value = SimpleDateFormat("HH:mm", Locale.getDefault()).format(selectedTime.time),
+                    onValueChange = {},
+                    label = { Text("Godzina") },
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    trailingIcon = {
+                        IconButton(onClick = { showTimePicker = true }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Wybierz godzinę")
+                        }
+                    }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val scheduledFor = try {
-                        formatter.parse(dateTime)?.time ?: sms.scheduledFor
-                    } catch (e: Exception) {
-                        sms.scheduledFor
-                    }
-                    
-                    onUpdate(name, phone, message, scheduledFor)
+                    val scheduledFor = Calendar.getInstance().apply {
+                        timeInMillis = selectedDate.timeInMillis
+                        set(Calendar.HOUR_OF_DAY, selectedTime.get(Calendar.HOUR_OF_DAY))
+                        set(Calendar.MINUTE, selectedTime.get(Calendar.MINUTE))
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+
+                    val fullPhoneNumber = selectedCountry.code + phoneNumber
+                    onUpdate(name, fullPhoneNumber, message, scheduledFor)
                 },
-                enabled = name.isNotBlank() && phone.isNotBlank() && message.isNotBlank() && 
-                         dateTime.isNotBlank()
+                enabled = name.isNotBlank() && phoneNumber.isNotBlank() && message.isNotBlank()
             ) {
                 Text("Zapisz")
             }
@@ -430,4 +671,62 @@ private fun EditScheduledSmsDialog(
             }
         }
     )
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedDate = Calendar.getInstance().apply {
+                            timeInMillis = datePickerState.selectedDateMillis ?: selectedDate.timeInMillis
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Anuluj")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // Time Picker Dialog
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Wybierz godzinę") },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // Create a calendar with only the selected time components
+                        selectedTime = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                            set(Calendar.MINUTE, timePickerState.minute)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        showTimePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Anuluj")
+                }
+            }
+        )
+    }
 }

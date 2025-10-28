@@ -1,14 +1,13 @@
 package com.example.smsbramkax1.sms
 
 import android.content.Context
-import com.example.smsbramkax1.data.SmsQueue
-import com.example.smsbramkax1.data.SmsStatus
+import com.example.smsbramkax1.data.SmsMessage
 import com.example.smsbramkax1.dto.BulkSmsProgressDTO
 import com.example.smsbramkax1.dto.BulkSmsRequestDTO
 import com.example.smsbramkax1.dto.BulkSmsResponseDTO
 import com.example.smsbramkax1.dto.BulkSmsStatus
 import com.example.smsbramkax1.storage.SmsDatabase
-import com.example.smsbramkax1.storage.SmsQueueDao
+import com.example.smsbramkax1.storage.SmsMessageDao
 import com.example.smsbramkax1.utils.LogManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +20,7 @@ import kotlin.random.Random
 class BulkSmsManager private constructor(private val context: Context) {
     
     private val database: SmsDatabase = SmsDatabase.getDatabase(context)
-    private val smsQueueDao: SmsQueueDao = database.smsQueueDao()
+    private val smsMessageDao: SmsMessageDao = database.smsMessageDao()
     private val smsManager: SmsManager = SmsManager(context)
     
     private val _bulkProgress = MutableStateFlow<Map<String, BulkSmsProgressDTO>>(emptyMap())
@@ -78,15 +77,15 @@ class BulkSmsManager private constructor(private val context: Context) {
         
         phoneNumbers.forEach { phoneNumber ->
             try {
-                val smsQueue = SmsQueue(
+                val smsMessage = SmsMessage(
                     phoneNumber = phoneNumber,
-                    message = messageBody,
                     messageBody = messageBody,
-                    status = SmsStatus.QUEUED,
+                    status = "QUEUED",
+                    isScheduled = false,
                     createdAt = currentTime,
                     batchId = batchId
                 )
-                smsQueueDao.insertSms(smsQueue)
+                smsMessageDao.insertMessage(smsMessage)
                 queuedCount++
             } catch (e: Exception) {
                 LogManager.log("ERROR", "BulkSmsManager", "Failed to queue SMS for $phoneNumber: ${e.message}")
@@ -101,7 +100,7 @@ class BulkSmsManager private constructor(private val context: Context) {
             try {
                 updateProgress(batchId) { it.copy(status = BulkSmsStatus.PROCESSING) }
                 
-                val queuedSms = smsQueueDao.getSmsByBatchId(batchId)
+                val queuedSms = smsMessageDao.getSmsByBatchId(batchId)
                 var sentCount = 0
                 var failedCount = 0
                 val errors = mutableListOf<String>()
@@ -109,16 +108,16 @@ class BulkSmsManager private constructor(private val context: Context) {
                 // Process in batches
                 queuedSms.chunked(batchSize).forEach { batch ->
                     for (sms in batch) {
-                        if (sms.status == SmsStatus.QUEUED) {
+                        if (sms.status == "QUEUED") {
                             try {
                                 val result = smsManager.sendSms(sms.phoneNumber, sms.messageBody)
                                 
-                                if (result) {
-                                    smsQueueDao.updateSmsStatus(sms.id, SmsStatus.SENT)
+                                if (result.isSuccess) {
+                                    smsMessageDao.updateMessageStatus(sms.id, "SENT", System.currentTimeMillis())
                                     sentCount++
                                     LogManager.log("INFO", "BulkSmsManager", "Bulk SMS sent: batchId=$batchId, to=${sms.phoneNumber}")
                                 } else {
-                                    smsQueueDao.updateSmsStatus(sms.id, SmsStatus.FAILED)
+                                    smsMessageDao.updateMessageStatus(sms.id, "FAILED")
                                     failedCount++
                                     errors.add("${sms.phoneNumber}: Send failed")
                                     LogManager.log("ERROR", "BulkSmsManager", "Bulk SMS failed: batchId=$batchId, to=${sms.phoneNumber}")
@@ -129,7 +128,7 @@ class BulkSmsManager private constructor(private val context: Context) {
                                     delay(delayMs)
                                 }
                             } catch (e: Exception) {
-                                smsQueueDao.updateSmsStatus(sms.id, SmsStatus.FAILED)
+                                smsMessageDao.updateMessageStatus(sms.id, "FAILED")
                                 failedCount++
                                 errors.add("${sms.phoneNumber}: ${e.message}")
                                 LogManager.log("ERROR", "BulkSmsManager", "Bulk SMS error: batchId=$batchId, to=${sms.phoneNumber}, error=${e.message}")
@@ -175,9 +174,9 @@ class BulkSmsManager private constructor(private val context: Context) {
             
             // Update remaining queued SMS to CANCELLED status
             CoroutineScope(Dispatchers.IO).launch {
-                val queuedSms = smsQueueDao.getSmsByBatchId(batchId)
-                queuedSms.filter { it.status == SmsStatus.QUEUED }.forEach { sms ->
-                    smsQueueDao.updateSmsStatus(sms.id, SmsStatus.FAILED)
+                val queuedSms = smsMessageDao.getSmsByBatchId(batchId)
+                queuedSms.filter { it.status == "QUEUED" }.forEach { sms ->
+                    smsMessageDao.updateMessageStatus(sms.id, "FAILED")
                 }
             }
             
@@ -206,10 +205,10 @@ class BulkSmsManager private constructor(private val context: Context) {
     
     suspend fun getDetailedProgress(batchId: String): BulkSmsProgressDTO? {
         return try {
-            val queuedSms = smsQueueDao.getSmsByBatchId(batchId)
-            val sentCount = queuedSms.count { it.status == SmsStatus.SENT }
-            val failedCount = queuedSms.count { it.status == SmsStatus.FAILED }
-            val queuedCount = queuedSms.count { it.status == SmsStatus.QUEUED }
+            val queuedSms = smsMessageDao.getSmsByBatchId(batchId)
+            val sentCount = queuedSms.count { it.status == "SENT" }
+            val failedCount = queuedSms.count { it.status == "FAILED" }
+            val queuedCount = queuedSms.count { it.status == "QUEUED" }
             
             val currentProgress = _bulkProgress.value[batchId]
             currentProgress?.copy(

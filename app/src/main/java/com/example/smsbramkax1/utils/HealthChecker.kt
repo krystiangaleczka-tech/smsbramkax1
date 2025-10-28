@@ -1,7 +1,7 @@
 package com.example.smsbramkax1.utils
 
 import android.content.Context
-import com.example.smsbramkax1.storage.SmsQueueDao
+import com.example.smsbramkax1.storage.SmsMessageDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -59,7 +59,7 @@ data class HealthStatus(
  */
 class HealthChecker(
     private val context: Context,
-    private val smsQueueDao: SmsQueueDao
+    private val smsMessageDao: SmsMessageDao
 ) {
     /**
      * Pobiera aktualny stan zdrowia systemu
@@ -69,12 +69,12 @@ class HealthChecker(
         val oneHourAgo = now - 60 * 60 * 1000
         val oneDayAgo = now - 24 * 60 * 60 * 1000
         
-        val pending = smsQueueDao.countByStatus("PENDING")
-        val failedHour = smsQueueDao.countFailedSince(oneHourAgo)
-        val failedDay = smsQueueDao.countFailedSince(oneDayAgo)
-        val lastSent = smsQueueDao.lastSentAt()
-        val totalSent = smsQueueDao.countByStatus("SENT")
-        val totalFailed = smsQueueDao.countByStatus("FAILED")
+        val pending = smsMessageDao.countByStatus("PENDING")
+        val failedHour = smsMessageDao.countFailedSince(oneHourAgo)
+        val failedDay = smsMessageDao.countFailedSince(oneDayAgo)
+        val lastSent = smsMessageDao.lastSentAt()
+        val totalSent = smsMessageDao.countByStatus("SENT")
+        val totalFailed = smsMessageDao.countByStatus("FAILED")
         
         val networkOk = NetworkState.isOnline(context)
         val isWifi = NetworkState.isWifi(context)

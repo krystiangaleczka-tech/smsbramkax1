@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.example.smsbramkax1.storage.SmsDatabase
 import com.example.smsbramkax1.ui.components.StatusBadge
 import com.example.smsbramkax1.ui.theme.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -47,14 +48,14 @@ fun HistoryScreen(onBack: () -> Unit) {
             isLoading = true
             try {
                 val database = SmsDatabase.getDatabase(context)
-                val allSms = database.smsQueueDao().getAllSms()
+                val sentSms = database.smsMessageDao().getSentMessages().first()
                 
-                messages = allSms.map { sms ->
+                messages = sentSms.map { sms ->
                     HistorySmsMessage(
                         id = sms.id,
                         phoneNumber = sms.phoneNumber,
-                        message = sms.message,
-                        status = sms.status.name,
+                        message = sms.messageBody,
+                        status = sms.status,
                         createdAt = sms.createdAt,
                         sentAt = sms.sentAt
                     )

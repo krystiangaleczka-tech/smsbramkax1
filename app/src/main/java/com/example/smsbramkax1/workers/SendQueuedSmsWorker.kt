@@ -30,7 +30,7 @@ class SendQueuedSmsWorker(
             val smsManager = SmsManager(applicationContext)
             
             // Sprawdź stan zdrowia systemu przed rozpoczęciem
-            val failedLastHour = database.smsQueueDao().countFailedSince(System.currentTimeMillis() - 60 * 60 * 1000)
+            val failedLastHour = database.smsMessageDao().countFailedSince(System.currentTimeMillis() - 60 * 60 * 1000)
             if (failedLastHour >= 5) {
                 Notify.error(
                     applicationContext,
@@ -39,9 +39,9 @@ class SendQueuedSmsWorker(
                 )
             }
             
-            val pendingSms = database.smsQueueDao().getSmsByStatus(SmsStatus.PENDING)
-            val scheduledSms = database.smsQueueDao().getSmsByStatus(SmsStatus.SCHEDULED)
-                .filter { it.scheduledAt != null && it.scheduledAt!! <= System.currentTimeMillis() }
+            val pendingSms = database.smsMessageDao().getSmsByStatus("PENDING")
+            val scheduledSms = database.smsMessageDao().getSmsByStatus("SCHEDULED")
+                .filter { it.scheduledFor != null && it.scheduledFor!! <= System.currentTimeMillis() }
             
             val smsToSend = (pendingSms + scheduledSms).sortedByDescending { it.priority }
             
@@ -51,17 +51,17 @@ class SendQueuedSmsWorker(
                 
                 smsToSend.forEach { sms ->
                     try {
-                        val success = smsManager.sendSms(sms.phoneNumber, sms.message)
+                        val result = smsManager.sendSms(sms.phoneNumber, sms.messageBody)
                         val currentTime = System.currentTimeMillis()
                         
-                        if (success) {
-                            database.smsQueueDao().updateSmsStatus(sms.id, SmsStatus.SENT, currentTime)
+                        if (result.isSuccess) {
+                            database.smsMessageDao().updateSmsStatus(sms.id, "SENT", currentTime)
                             LogManager.log("INFO", "SendQueuedSmsWorker", "SMS sent successfully to ${sms.phoneNumber}")
                             sentCount++
                         } else {
-                            database.smsQueueDao().incrementRetryCount(sms.id)
+                            database.smsMessageDao().incrementRetryCount(sms.id)
                             if (sms.retryCount >= 3) {
-                                database.smsQueueDao().updateSmsStatus(sms.id, SmsStatus.FAILED, currentTime)
+                                database.smsMessageDao().updateSmsStatus(sms.id, "FAILED", currentTime)
                             }
                             LogManager.log("WARN", "SendQueuedSmsWorker", "Failed to send SMS to ${sms.phoneNumber}")
                             failedCount++
@@ -69,17 +69,17 @@ class SendQueuedSmsWorker(
                         
                         val statusUpdate = com.example.smsbramkax1.dto.SmsStatusUpdateDTO(
                             smsId = sms.id,
-                            status = if (success) "SENT" else "FAILED",
+                            status = if (result.isSuccess) "SENT" else "FAILED",
                             sentAt = currentTime,
-                            errorMessage = if (!success) "SMS sending failed" else null
+                            errorMessage = if (!result.isSuccess) "SMS sending failed" else null
                         )
                         
                         networkManager.sendSmsStatus(statusUpdate)
                         
                     } catch (e: Exception) {
-                        database.smsQueueDao().incrementRetryCount(sms.id)
+                        database.smsMessageDao().incrementRetryCount(sms.id)
                         if (sms.retryCount >= 3) {
-                            database.smsQueueDao().updateSmsStatus(sms.id, SmsStatus.FAILED, System.currentTimeMillis())
+                            database.smsMessageDao().updateSmsStatus(sms.id, "FAILED", System.currentTimeMillis())
                         }
                         LogManager.log("ERROR", "SendQueuedSmsWorker", "Error sending SMS to ${sms.phoneNumber}: ${e.message}")
                         failedCount++

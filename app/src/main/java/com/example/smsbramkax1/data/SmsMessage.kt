@@ -7,14 +7,21 @@ import androidx.room.PrimaryKey
 data class SmsMessage(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val externalId: String,
     val phoneNumber: String,
     val messageBody: String,
-    val status: String, // QUEUED, SENT, DELIVERED, FAILED
-    val queuedAt: Long,
-    val scheduledFor: Long,
+    val status: String, // PENDING, QUEUED, SENT, DELIVERED, FAILED, SCHEDULED
+    val isScheduled: Boolean = false,
+    val scheduledFor: Long? = null,
+    val scheduledAt: Long? = null, // Legacy compatibility
+    val createdAt: Long = System.currentTimeMillis(),
     val sentAt: Long? = null,
     val deliveredAt: Long? = null,
     val errorMessage: String? = null,
-    val retryCount: Int = 0
-)
+    val retryCount: Int = 0,
+    val priority: Int = 5,
+    val batchId: String? = null,
+    val category: String? = null
+) {
+    // Legacy compatibility property
+    val message: String get() = messageBody
+}

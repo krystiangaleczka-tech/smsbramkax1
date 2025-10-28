@@ -127,15 +127,15 @@ private fun sendTestSms(context: android.content.Context, scope: CoroutineScope)
             val testMessage = "Zapraszam na jutrzejsza wizyte do serduszka Krystusia <3"
             
             // Najpierw dodaj SMS do kolejki
-            val smsQueue = com.example.smsbramkax1.data.SmsQueue(
+            val smsMessage = com.example.smsbramkax1.data.SmsMessage(
                 phoneNumber = testPhoneNumber,
-                message = testMessage,
-                status = com.example.smsbramkax1.data.SmsStatus.PENDING,
-                priority = 10, // Wysoki priorytet dla testowego SMS
+                messageBody = testMessage,
+                status = "PENDING",
+                isScheduled = false,
                 createdAt = System.currentTimeMillis()
             )
             
-            val smsId = database.smsQueueDao().insertSms(smsQueue)
+            val smsId = database.smsMessageDao().insertMessage(smsMessage)
             
             // Sprawdź stan sieci przed wysłaniem
             if (!NetworkState.isOnline(context)) {
@@ -153,18 +153,18 @@ private fun sendTestSms(context: android.content.Context, scope: CoroutineScope)
             }
             
             // Wyślij SMS bezpośrednio
-            val success = smsManager.sendSms(testPhoneNumber, testMessage)
+            val result = smsManager.sendSms(testPhoneNumber, testMessage)
             
             // Zaktualizuj status w bazie
             val currentTime = System.currentTimeMillis()
-            if (success) {
-                database.smsQueueDao().updateSmsStatus(smsId, com.example.smsbramkax1.data.SmsStatus.SENT, currentTime)
+            if (result.isSuccess) {
+                database.smsMessageDao().updateMessageStatus(smsId, "SENT", currentTime)
             } else {
-                database.smsQueueDao().updateSmsStatus(smsId, com.example.smsbramkax1.data.SmsStatus.FAILED, currentTime)
+                database.smsMessageDao().updateMessageStatus(smsId, "FAILED")
             }
             
             scope.launch(Dispatchers.Main) {
-                if (success) {
+                if (result.isSuccess) {
                     Toast.makeText(
                         context, 
                         "Test SMS wysłany pomyślnie!", 
@@ -201,22 +201,22 @@ private fun showSmsHistory(context: android.content.Context, scope: CoroutineSco
     scope.launch(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val recentSms = database.smsQueueDao().getRecentSms(20).first()
+            val recentSms = database.smsMessageDao().getAllMessages().first().take(20)
             
             scope.launch(Dispatchers.Main) {
                 if (recentSms.isEmpty()) {
                     Toast.makeText(context, "Brak SMS-ów w historii", Toast.LENGTH_SHORT).show()
                 } else {
-                    val historyText = recentSms.take(5).joinToString("\n\n") { sms: com.example.smsbramkax1.data.SmsQueue ->
-                        val status = when (sms.status.name) {
+                    val historyText = recentSms.take(5).joinToString("\n\n") { sms ->
+                        val status = when (sms.status) {
                             "PENDING" -> "Oczekujący"
                             "SENT" -> "Wysłany"
                             "FAILED" -> "Błąd"
                             "SCHEDULED" -> "Zaplanowany"
-                            else -> sms.status.name
+                            else -> sms.status
                         }
                         val date = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(Date(sms.createdAt))
-                        "📱 ${sms.phoneNumber}\n📅 $date\n📊 Status: $status\n💬 ${sms.message.take(50)}${if (sms.message.length > 50) "..." else ""}"
+                        "📱 ${sms.phoneNumber}\n📅 $date\n📊 Status: $status\n💬 ${sms.messageBody.take(50)}${if (sms.messageBody.length > 50) "..." else ""}"
                     }
                     
                     Toast.makeText(context, "Ostatnie SMS-y:\n\n$historyText", Toast.LENGTH_LONG).show()
@@ -236,7 +236,7 @@ private fun exportSmsData(context: android.content.Context, scope: CoroutineScop
     scope.launch(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val allSms = database.smsQueueDao().getAllSms()
+            val allSms = database.smsMessageDao().getAllSms()
             
             if (allSms.isEmpty()) {
                 scope.launch(Dispatchers.Main) {
@@ -255,12 +255,12 @@ private fun exportSmsData(context: android.content.Context, scope: CoroutineScop
                 
                 // Dane SMS
                 allSms.forEach { sms ->
-                    val status = when (sms.status.name) {
+                    val status = when (sms.status) {
                         "PENDING" -> "Oczekujący"
                         "SENT" -> "Wysłany"
                         "FAILED" -> "Błąd"
                         "SCHEDULED" -> "Zaplanowany"
-                        else -> sms.status.name
+                        else -> sms.status
                     }
                     val createdDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(sms.createdAt))
                     val sentDate = sms.sentAt?.let { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(it)) } ?: ""

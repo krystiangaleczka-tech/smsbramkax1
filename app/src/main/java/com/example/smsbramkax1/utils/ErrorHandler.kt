@@ -15,7 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import com.example.smsbramkax1.data.SmsQueue
+import com.example.smsbramkax1.data.SmsMessage
 import com.example.smsbramkax1.storage.SmsDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -171,9 +171,9 @@ fun ConfirmationDialog(
 fun RetryFailedSmsDialog(
     isVisible: Boolean,
     onDismiss: () -> Unit,
-    onRetry: (SmsQueue) -> Unit,
-    onRetryAll: (List<SmsQueue>) -> Unit,
-    failedSms: List<SmsQueue>
+    onRetry: (SmsMessage) -> Unit,
+    onRetryAll: (List<SmsMessage>) -> Unit,
+    failedSms: List<SmsMessage>
 ) {
     if (isVisible && failedSms.isNotEmpty()) {
         AlertDialog(
@@ -247,16 +247,16 @@ suspend fun retryFailedSms(
     return withContext(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val smsQueue = database.smsQueueDao().getSmsById(smsId)
+            val smsMessage = database.smsMessageDao().getSmsById(smsId)
             
-            if (smsQueue != null) {
+            if (smsMessage != null) {
                 val smsManager = com.example.smsbramkax1.sms.SmsManager(context)
-                val success = smsManager.sendSms(smsQueue.phoneNumber, smsQueue.message)
+                val result = smsManager.sendSms(smsMessage.phoneNumber, smsMessage.messageBody)
                 
-                if (success) {
-                    database.smsQueueDao().updateSmsStatus(
+                if (result.isSuccess) {
+                    database.smsMessageDao().updateSmsStatus(
                         smsId, 
-                        com.example.smsbramkax1.data.SmsStatus.SENT, 
+                        "SENT", 
                         System.currentTimeMillis()
                     )
                     withContext(Dispatchers.Main) {
@@ -264,13 +264,13 @@ suspend fun retryFailedSms(
                         Notify.success(context, "Sukces", "SMS został ponownie wysłany")
                     }
                 } else {
-                    database.smsQueueDao().incrementRetryCount(smsId)
+                    database.smsMessageDao().incrementRetryCount(smsId)
                     withContext(Dispatchers.Main) {
                         ErrorHandler.showError(context, "Nie udało się wysłać SMS")
                         Notify.error(context, "Błąd", "SMS nie został wysłany")
                     }
                 }
-                success
+                result.isSuccess
             } else {
                 withContext(Dispatchers.Main) {
                     ErrorHandler.showError(context, "Nie znaleziono SMS w bazie danych")
@@ -293,22 +293,22 @@ suspend fun retryAllFailedSms(
     return withContext(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val failedSms = database.smsQueueDao().getSmsByStatus(com.example.smsbramkax1.data.SmsStatus.FAILED)
+            val failedSms = database.smsMessageDao().getSmsByStatus("FAILED")
             var successCount = 0
             
-            for (sms: com.example.smsbramkax1.data.SmsQueue in failedSms) {
+            for (sms: com.example.smsbramkax1.data.SmsMessage in failedSms) {
                 val smsManager = com.example.smsbramkax1.sms.SmsManager(context)
-                val success = smsManager.sendSms(sms.phoneNumber, sms.message)
+                val result = smsManager.sendSms(sms.phoneNumber, sms.messageBody)
                 
-                if (success) {
-                    database.smsQueueDao().updateSmsStatus(
+                if (result.isSuccess) {
+                    database.smsMessageDao().updateSmsStatus(
                         sms.id,
-                        com.example.smsbramkax1.data.SmsStatus.SENT,
+                        "SENT",
                         System.currentTimeMillis()
                     )
                     successCount++
                 } else {
-                    database.smsQueueDao().incrementRetryCount(sms.id)
+                    database.smsMessageDao().incrementRetryCount(sms.id)
                 }
             }
             

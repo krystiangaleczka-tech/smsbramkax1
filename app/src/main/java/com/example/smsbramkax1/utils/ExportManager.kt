@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import androidx.core.content.FileProvider
-import com.example.smsbramkax1.data.SmsQueue
+import com.example.smsbramkax1.data.SmsMessage
 import com.example.smsbramkax1.data.SystemLog
 import com.example.smsbramkax1.storage.SmsDatabase
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +27,7 @@ class ExportManager(private val context: Context) {
     suspend fun exportSmsToCsv(): Result<String> = withContext(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val allSms = database.smsQueueDao().getAllSms()
+            val allSms = database.smsMessageDao().getAllSms()
             
             if (allSms.isEmpty()) {
                 return@withContext Result.failure(Exception("Brak danych do eksportu"))
@@ -43,12 +43,12 @@ class ExportManager(private val context: Context) {
                 
                 // SMS Data
                 allSms.forEach { sms ->
-                    val status = when (sms.status.name) {
+                    val status = when (sms.status) {
                         "PENDING" -> "Oczekujący"
                         "SENT" -> "Wysłany"
                         "FAILED" -> "Błąd"
                         "SCHEDULED" -> "Zaplanowany"
-                        else -> sms.status.name
+                        else -> sms.status
                     }
                     
                     val createdDate = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(sms.createdAt))
@@ -132,11 +132,11 @@ class ExportManager(private val context: Context) {
                         
                         if (phoneNumber.isNotEmpty() && message.isNotEmpty()) {
                             val status = when (statusStr) {
-                                "Oczekujący", "PENDING" -> com.example.smsbramkax1.data.SmsStatus.PENDING
-                                "Wysłany", "SENT" -> com.example.smsbramkax1.data.SmsStatus.SENT
-                                "Błąd", "FAILED" -> com.example.smsbramkax1.data.SmsStatus.FAILED
-                                "Zaplanowany", "SCHEDULED" -> com.example.smsbramkax1.data.SmsStatus.SCHEDULED
-                                else -> com.example.smsbramkax1.data.SmsStatus.PENDING
+                                "Oczekujący", "PENDING" -> "PENDING"
+                                "Wysłany", "SENT" -> "SENT"
+                                "Błąd", "FAILED" -> "FAILED"
+                                "Zaplanowany", "SCHEDULED" -> "SCHEDULED"
+                                else -> "PENDING"
                             }
                             
                             val createdAt = try {
@@ -145,15 +145,16 @@ class ExportManager(private val context: Context) {
                                 System.currentTimeMillis()
                             }
                             
-                            val smsQueue = SmsQueue(
+                            val smsMessage = SmsMessage(
                                 phoneNumber = phoneNumber,
-                                message = message,
+                                messageBody = message,
                                 status = status,
                                 priority = priority,
-                                createdAt = createdAt
+                                createdAt = createdAt,
+                                isScheduled = status == "SCHEDULED"
                             )
                             
-                            database.smsQueueDao().insertSms(smsQueue)
+                            database.smsMessageDao().insertSms(smsMessage)
                             importedCount++
                         }
                     }
@@ -197,7 +198,7 @@ class ExportManager(private val context: Context) {
     suspend fun exportFullBackup(): Result<String> = withContext(Dispatchers.IO) {
         try {
             val database = SmsDatabase.getDatabase(context)
-            val allSms = database.smsQueueDao().getAllSms()
+            val allSms = database.smsMessageDao().getAllSms()
             val allLogs = database.logDao().getRecentLogs(1000)
             
             val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
@@ -211,7 +212,7 @@ class ExportManager(private val context: Context) {
                     put("id", sms.id)
                     put("phoneNumber", sms.phoneNumber)
                     put("message", sms.message)
-                    put("status", sms.status.name)
+                    put("status", sms.status)
                     put("createdAt", sms.createdAt)
                     put("sentAt", sms.sentAt ?: 0)
                     put("retryCount", sms.retryCount)

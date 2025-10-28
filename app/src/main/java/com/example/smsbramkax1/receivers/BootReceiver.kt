@@ -55,17 +55,34 @@ class BootReceiver : BroadcastReceiver() {
                 TimeUnit.SECONDS
             )
             .build()
-        
+
+        // ProcessScheduledSmsWorker doesn't need any constraints
+        val processScheduledWorkRequest = PeriodicWorkRequestBuilder<com.example.smsbramkax1.workers.ProcessScheduledSmsWorker>(
+            1, TimeUnit.MINUTES
+        )
+            .setBackoffCriteria(
+                androidx.work.BackoffPolicy.EXPONENTIAL,
+                10,
+                TimeUnit.SECONDS
+            )
+            .build()
+
         workManager.enqueueUniquePeriodicWork(
             "fetch_pending_sms",
             ExistingPeriodicWorkPolicy.UPDATE,
             fetchWorkRequest
         )
-        
+
         workManager.enqueueUniquePeriodicWork(
             "send_queued_sms",
             ExistingPeriodicWorkPolicy.UPDATE,
             sendWorkRequest
+        )
+
+        workManager.enqueueUniquePeriodicWork(
+            "process_scheduled_sms",
+            ExistingPeriodicWorkPolicy.UPDATE,
+            processScheduledWorkRequest
         )
         
         LogManager.log("INFO", "BootReceiver", "Workers scheduled successfully")
